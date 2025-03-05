@@ -4,8 +4,7 @@ from util.enron_parser import EnronMaildirParser
 def main():
     # Define the directories to be processed
     maildir_paths = [
-        "data/maildir/allen-p",
-        "data/maildir/buy-r"
+        "data/test-data",
     ]
     
     # Create an instance of the parser
@@ -20,11 +19,9 @@ def main():
     for key, value in stats.items():
         print(f"{key}: {value}")
     
-    # Print a portion of the people found
-    print("\nSample of People Found:")
-    sample_people = list(parser.people.values())[:10]  # Get the first 10 people
-    for person in sample_people:
-        print(f"Name: {person.name}, Email: {person.email}")
+    # print how many emails have the "in_reply_to" attribute initialized
+    for i, email in enumerate(parser.emails.values()):
+        print(f"{i:2}: {email.recipients}")
 
 if __name__ == "__main__":
     main() 

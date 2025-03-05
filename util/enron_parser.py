@@ -8,11 +8,18 @@ from enum import Enum
 from util.node_models import Email, Person
 
 class EmailRelationship(Enum):
+    """Relationships between two Emails"""
     REPLY = "reply"
     FORWARD = "forward"
     REFERENCE = "reference"
     IN_REPLY_TO = "in_reply_to"
-    ROOT = "root"  # For the first email in a thread
+
+class PersonEmailRelationship(Enum):
+    """Relationships between Persons and Emails"""
+    SENT = "sent"
+    RECIEVED = "recieved"
+    CC_RECIEVED = "cc_recieved"
+    BCC_RECIEVED = "bcc_recieved"
 
 class ParsingStatistics:
     """Tracks statistics during parsing"""
@@ -93,11 +100,12 @@ class EnronMaildirParser:
                 try:
                     email = Email.from_file(file_path)
                     self._processed_files.add(file_path)
+                    
                     self.stats.files_processed += 1
                     
                     # Track attachment statistics
                     if email.attachments:
-                        print("Found email with attachments: ", email.message_id)  # //////////////////////////////////
+                        print("Found email with attachments: ", email.message_id)  # /////// this never prints, no attachments are ever found
                         self.stats.emails_with_attachments += 1
                         self.stats.total_attachments += len(email.attachments)
                     
