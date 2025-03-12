@@ -1,150 +1,149 @@
-import os
-from typing import Dict, Generator, List, Set, Tuple
+import re
+from os import path, listdir
+import sys
+import json
 from tqdm import tqdm
-from collections import defaultdict
-from datetime import datetime
-from enum import Enum
 
-from util.node_models import Email, Person
+#
+# Precompiled patterns for performance
+#
+time_pattern = re.compile("Date: (?P<data>[A-Z][a-z]+\, \d{1,2} [A-Z][a-z]+ \d{4} \d{2}\:\d{2}\:\d{2} \-\d{4} \([A-Z]{3}\))")
+subject_pattern = re.compile("Subject: (?P<data>.*)")
+sender_pattern = re.compile("From: (?P<data>.*)")
+recipient_pattern = re.compile("To: (?P<data>.*)")
+cc_pattern = re.compile("cc: (?P<data>.*)")
+bcc_pattern = re.compile("bcc: (?P<data>.*)")
+msg_start_pattern = re.compile("\n\n", re.MULTILINE)
+msg_end_pattern = re.compile("\n+.*\n\d+/\d+/\d+ \d+:\d+ [AP]M", re.MULTILINE)
 
-class EmailRelationship(Enum):
-    """Relationships between two Emails"""
-    REPLY = "reply"
-    FORWARD = "forward"
-    REFERENCE = "reference"
-    IN_REPLY_TO = "in_reply_to"
+#
+# Function: parse_email
+# Arguments: pathname - relative path of folder/file to be parsed
+#            orig     - whether this call is the original, used for writing to file
+#            progress_bar - progress bar for tracking progress
+# Returns: none
+# Effects: dumps json into file
+#
+feeds = []
+users = {}
+threads = {}
+thread_users = {}
+user_threads = {}
 
-class PersonEmailRelationship(Enum):
-    """Relationships between Persons and Emails"""
-    SENT = "sent"
-    RECIEVED = "recieved"
-    CC_RECIEVED = "cc_recieved"
-    BCC_RECIEVED = "bcc_recieved"
+def count_files(pathname):
+    """Recursively count the number of files in the directory."""
+    if path.isdir(pathname):
+        total_files = 0
+        for child in listdir(pathname):
+            if child[0] != ".":  # Skip hidden files
+                total_files += count_files(path.join(pathname, child))
+        return total_files
+    else:
+        return 1  # Count this file
 
-class ParsingStatistics:
-    """Tracks statistics during parsing"""
-    def __init__(self):
-        self.total_files_found = 0
-        self.files_processed = 0
-        self.files_errored = 0
-        self.total_emails = 0
-        self.emails_with_attachments = 0
-        self.total_attachments = 0
-        self.parse_errors = defaultdict(int)
-        self.start_time = None
-        self.end_time = None
-        
-    def to_dict(self):
-        return {
-            "total_files_found": self.total_files_found,
-            "files_processed": self.files_processed,
-            "files_errored": self.files_errored,
-            "success_rate": f"{(self.files_processed / self.total_files_found * 100):.2f}%" if self.total_files_found else "0%",
-            "total_emails": self.total_emails,
-            "emails_with_attachments": self.emails_with_attachments,
-            "total_attachments": self.total_attachments,
-            "parse_errors": dict(self.parse_errors),
-            "processing_time": str(self.end_time - self.start_time) if self.end_time else "N/A"
-        }
+def parse_email(pathname, orig=True, progress_bar=None):
+    if orig:
+        total_files = count_files(pathname)  # Count total files for progress bar
+        print(f"Total files to process: {total_files}")
+        progress_bar = tqdm(total=total_files, desc="Processing files", unit="file")  # Overall progress bar
 
-class EnronMaildirParser:
-    """Parser for the Enron email dataset"""
-    
-    def __init__(self, maildir_paths: List[str]):
-        self.maildir_paths = maildir_paths  # Now accepts a list of directories
-        self.emails: Dict[str, Email] = {}  # message_id -> Email
-        self.people: Dict[str, Person] = {}  # email -> Person
-        self._processed_files: Set[str] = set()
-        self.stats = ParsingStatistics()
-        
-    def process_maildir(self, max_emails: int = None) -> None:
-        """Process all emails in the given directories, up to a maximum number if specified"""
-
-        # log the start time
-        self.stats.start_time = datetime.now()
-        
-        # First count total files across all specified directories
-        self.stats.total_files_found = sum(
-            len([f for f in files if not f.startswith('.')])
-            for maildir_path in self.maildir_paths
-            for _, _, files in os.walk(maildir_path)
-        )
-        
-        # Process emails iteratively
-        email_count = 0  # Counter for processed emails
-        for maildir_path in self.maildir_paths:
-            for email in self.iter_emails(maildir_path):
-                self._add_email(email)
-                email_count += 1
-                
-                if max_emails is not None and email_count >= max_emails:
-                    break  # Stop processing if the limit is reached
-        
-        # log the end time
-        self.stats.end_time = datetime.now()
-    
-    def iter_emails(self, maildir_path: str) -> Generator[Email, None, None]:
-        """Iterate through all email files in the given directory and its subdirectories"""
-        print(f"Processing directory: {maildir_path}")  # //////////////////////////////////
-        
-        for root, _, files in os.walk(maildir_path):
-            files_to_process = [f for f in files if not f.startswith('.')]
-            for file in tqdm(files_to_process, desc=f"Processing emails in {root}"):
-                file_path = os.path.join(root, file)
-
-                # check if we have already processed the file
-                if file_path in self._processed_files:
-                    continue
-                
-                # try to parse the email
+    if path.isdir(pathname):
+        progress_bar.write(f"Processing directory: {pathname}")  # Use write for directory messages
+        for child in listdir(pathname):
+            if child[0] != ".":
+                parse_email(path.join(pathname, child), False, progress_bar)
+    else:
+        # progress_bar.write(f"Processing file: {pathname}")  # Use write for file messages
+        # Open the file with error handling for invalid characters
+        with open(pathname, encoding='utf-8', errors='replace') as TextFile:
+            text = TextFile.read().replace("\r", "")
+            # Skip characters outside of Unicode range
+            text = re.sub(r'[^\x00-\x7F]+', '', text)  # Remove non-ASCII characters
+            try:
+                time = time_pattern.search(text).group("data").replace("\n", "")
+                subject = subject_pattern.search(text).group("data").replace("\n", "")
+                sender = sender_pattern.search(text).group("data").replace("\n", "")
+                recipient = recipient_pattern.search(text).group("data").split(", ")
+                cc = cc_pattern.search(text).group("data").split(", ")
+                bcc = bcc_pattern.search(text).group("data").split(", ")
+                msg_start_iter = msg_start_pattern.search(text).end()
                 try:
-                    email = Email.from_file(file_path)
-                    self._processed_files.add(file_path)
-                    
-                    self.stats.files_processed += 1
-                    
-                    # Track attachment statistics
-                    if email.attachments:
-                        print("Found email with attachments: ", email.message_id)  # /////// this never prints, no attachments are ever found
-                        self.stats.emails_with_attachments += 1
-                        self.stats.total_attachments += len(email.attachments)
-                    
-                    yield email
-                    
-                except Exception as e:
-                    self.stats.files_errored += 1
-                    self.stats.parse_errors[str(e)] += 1
-    
-    def _add_email(self, email: Email) -> None:
-        """Add an email to the internal data structures"""
-        self.stats.total_emails += 1
-        
-        # Store email in internal list
-        self.emails[email.message_id] = email
-        
-        # Store people
-        self._add_person(email.sender)
-        for recipient in email.recipients + email.cc_recipients + email.bcc_recipients:
-            self._add_person(recipient)
-        
-    
-    def _add_person(self, person: Person) -> None:
-        """Add a person to the internal data structures"""
-        if person.email not in self.people:
-            # add new person if they don't exist
-            self.people[person.email] = person
+                    msg_end_iter = msg_end_pattern.search(text).start()
+                    message = text[msg_start_iter:msg_end_iter]
+                except AttributeError:  # not a reply
+                    message = text[msg_start_iter:]
+                message = re.sub("[\n\r]", " ", message)
+                message = re.sub("  +", " ", message)
+            except AttributeError:
+                logging.error("Failed to parse %s" % pathname)
+                return None
+            # get user and thread ids
+            sender_id = get_or_allocate_uid(sender)
+            recipient_id = [get_or_allocate_uid(u.replace("\n", "")) for u in recipient if u!=""]
+            cc_ids = [get_or_allocate_uid(u.replace("\n", "")) for u in cc if u!=""]
+            bcc_ids = [get_or_allocate_uid(u.replace("\n", "")) for u in bcc if u!=""]
+            thread_id = get_or_allocate_tid(subject)
+        if thread_id not in thread_users:
+            thread_users[thread_id] = set()
+        # maintain list of users involved in thread
+        users_involved = []
+        users_involved.append(sender_id)
+        users_involved.extend(recipient_id)
+        users_involved.extend(cc_ids)
+        users_involved.extend(bcc_ids)
+        thread_users[thread_id] |= set(users_involved)
+        # maintain list of threads where user is involved
+        for user in set(users_involved):
+            if user not in user_threads:
+                user_threads[user] = set()
+            user_threads[user].add(thread_id)
+ 
+        entry =  {"time": time, "thread": thread_id, "sender": sender_id, "recipient": recipient_id, "cc": cc_ids, "bcc": bcc_ids, "message": message}
+        feeds.append(entry)
 
-        elif person.name and not self.people[person.email].name:
-            # Update name if we find one for an existing person
-            self.people[person.email].name = person.name
+        # Update progress bar after processing each file
+        progress_bar.update(1)  # Update progress bar after processing each file
 
-    
-    def get_folder_structure(self) -> Dict[str, List[str]]:
-        """Get the folder structure and emails in each folder"""
-        structure = defaultdict(list)
-        
-        for email in self.emails.values():
-            structure[email.folder_path].append(email.message_id)
-        
-        return structure
-    
+    if orig:
+        progress_bar.close()  # Close the progress bar when done
+        try:
+            with open('messages2.json', 'w') as f:
+                json.dump(feeds, f)
+            with open('users2.json', 'w') as f:
+                json.dump(users, f)
+            with open('threads2.json', 'w') as f:
+                json.dump(threads, f)
+            with open('thread-users2.json', 'w') as f:
+                for thread in thread_users:
+                    thread_users[thread] = list(thread_users[thread])
+                json.dump(thread_users, f)
+            with open('user-threads2.json', 'w') as f:
+                for user in user_threads:
+                    user_threads[user] = list(user_threads[user])
+                json.dump(user_threads, f)
+        except IOError:
+            print("Unable to write to output files, aborting")
+            exit(1)
+
+#
+# Function: get_or_allocated_uid
+# Arguments: name - string of a user email
+# Returns: unique integer id
+#
+def get_or_allocate_uid(name):
+     if name not in users:
+         users[name] = len(users)
+     return users[name]
+
+#
+# Function: get_or_allocate_tid
+# Arguments: name - string of email subject line
+# Returns: unique integer id
+#
+def get_or_allocate_tid(name):
+    parsed_name = re.sub("(RE|Re|FWD|Fwd): ", "", name)
+    if parsed_name not in threads:
+        threads[parsed_name] = len(threads)
+    return threads[parsed_name]
+
+parse_email(sys.argv[1])
