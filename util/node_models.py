@@ -56,7 +56,6 @@ class Email:
     cc_recipients: List[Person] = field(default_factory=list)
     bcc_recipients: List[Person] = field(default_factory=list)
     attachments: List[Attachment] = field(default_factory=list)
-    in_reply_to: Optional[str] = None
     references: List[str] = field(default_factory=list)
     folder_path: str = ""
     
