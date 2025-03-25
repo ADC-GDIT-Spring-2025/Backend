@@ -1,0 +1,56 @@
+{
+    "nodes": {
+      "Person": [
+        {
+          "id": "0",
+          "email": "jeff.skilling@enron.com"
+        }
+      ],
+      "Email": [
+        {
+          "thread_id": "0",
+          "subject": "Subject goes here",
+          "body": "Email body goes here"
+        }
+      ]
+    },
+    "relationships": {
+      "SENT": [
+        {
+          "person_id": "0",
+          "email_id": "0"
+        }
+      ],
+      "RECEIVED": [
+        {
+          "email_id": "dcf456",
+          "person_id": "abc123"
+        }
+      ],
+      "RECEIVED_CC": [
+        {
+          "email_id": "dcf456",
+          "person_id": "abc123"
+        }
+      ],
+      "RECEIVED_BCC": [
+        {
+          "email_id": "dcf456",
+          "person_id": "abc123"
+        }
+      ],
+      "REPLY": [
+        {
+          "from_email_id": "dcf456",
+          "to_email_id": "abc123"
+        }
+      ],
+      "FORWARD": [
+        {
+          "from_email_id": "dcf456",
+          "to_email_id": "abc123"
+        }
+      ]
+    }
+  }
+  
