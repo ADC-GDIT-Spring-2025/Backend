@@ -1,6 +1,8 @@
 import sys
 import json
+import requests
 from neo4j import GraphDatabase
+import time
 
 # Neo4j connection details (adjust these as needed)
 URI = "bolt://localhost:7687"
@@ -62,52 +64,48 @@ def main():
         print("Invalid value provided for max_emails or max_users. Please provide integers.")
         sys.exit(1)
 
-    # Load users and messages from JSON files
-    with open("../user_data/users2.json", "r") as f:
-        users_data = json.load(f)
-    with open("../user_data/messages2.json", "r") as f:
-        messages_data = json.load(f)
+    users_url = f'http://localhost:5002/users?limit={max_users}'
+    messages_url = f'http://localhost:5002/messages?limit={max_emails}'
 
-    # Limit the messages to only the first max_emails messages
-    messages_data = messages_data[:max_emails]
+    users_data = requests.get(users_url, stream=True).json()
+    messages_data = requests.get(messages_url, stream=True).json()
 
-    # Limit the users to only the first max_users entries.
-    limited_users_data = dict(list(users_data.items())[:max_users])
-    
     driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
     with driver.session() as session:
+        # Start timing the node upload
+        start_time = time.time()
+
         # Create Person nodes from the limited users data
-        for email, person_id in limited_users_data.items():
+        for email, person_id in users_data.items():
             session.write_transaction(create_person, person_id, email)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Uploaded {len(users_data)} Person nodes in {elapsed_time:.2f} seconds.")
 
         # Create Email nodes and relationships for the messages
         for idx, message in enumerate(messages_data):
             email_id = str(idx)  # Unique email id based on the index
-            time = message.get("time", "")
+            time_ = message.get("time", "")
             thread = message.get("thread", "")
             body = message.get("message", "")
 
-            # Create the Email node
-            session.write_transaction(create_email, email_id, time, thread, body)
+            session.write_transaction(create_email, email_id, time_, thread, body)
 
-            # Create the SENT relationship from the sender to the email if the sender exists in our limited users
             sender_id = message.get("sender")
-            if sender_id is not None and sender_id in limited_users_data.values():
+            if sender_id is not None and sender_id in users_data.values():
                 session.write_transaction(create_relationship_sent, sender_id, email_id)
 
-            # Create RECEIVED relationships for each recipient if they exist in our limited users
             for rec in message.get("recipient", []):
-                if rec in limited_users_data.values():
+                if rec in users_data.values():
                     session.write_transaction(create_relationship_received, email_id, rec)
 
-            # Create RECEIVED_CC relationships for each cc if they exist in our limited users
             for cc in message.get("cc", []):
-                if cc in limited_users_data.values():
+                if cc in users_data.values():
                     session.write_transaction(create_relationship_received_cc, email_id, cc)
 
-            # Create RECEIVED_BCC relationships for each bcc if they exist in our limited users
             for bcc in message.get("bcc", []):
-                if bcc in limited_users_data.values():
+                if bcc in users_data.values():
                     session.write_transaction(create_relationship_received_bcc, email_id, bcc)
 
     driver.close()
