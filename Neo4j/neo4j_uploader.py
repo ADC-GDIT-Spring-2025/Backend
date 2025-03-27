@@ -51,21 +51,31 @@ def create_relationship_received_bcc(tx, email_id, person_id):
     """
     tx.run(query, email_id=email_id, person_id=person_id)
 
-def main():
-    # Check for command line arguments for maximum emails and maximum users to process
-    if len(sys.argv) < 3:
-        print("Usage: python neo4j_importer.py <max_emails> <max_users>")
-        sys.exit(1)
-    
-    try:
-        max_emails = int(sys.argv[1])
-        max_users = int(sys.argv[2])
-    except ValueError:
-        print("Invalid value provided for max_emails or max_users. Please provide integers.")
-        sys.exit(1)
 
-    users_url = f'http://localhost:5002/users?limit={max_users}'
-    messages_url = f'http://localhost:5002/messages?limit={max_emails}'
+
+def main():
+    limit_data = False
+    
+    # Check for command line arguments for maximum emails and maximum users to process
+    if len(sys.argv) != 1 and len(sys.argv) != 3:
+        print("Usage: \n\tpython neo4j_uploader.py \n\tpython neo4j_uploader.py <max_emails> <max_users>")
+        sys.exit(1)
+    elif len(sys.argv) == 3:
+        try:
+            max_emails = int(sys.argv[1])
+            max_users = int(sys.argv[2])
+            limit_data = True
+        except ValueError:
+            print("Invalid value provided for max_emails or max_users. Please provide integers.")
+            sys.exit(1)
+    
+
+    if limit_data:
+        users_url = f'http://localhost:5002/users?limit={max_users}'
+        messages_url = f'http://localhost:5002/messages?limit={max_emails}'
+    else:
+        users_url = 'http://localhost:5002/users'
+        messages_url = f'http://localhost:5002/messages'
 
     users_data = requests.get(users_url, stream=True).json()
     messages_data = requests.get(messages_url, stream=True).json()
