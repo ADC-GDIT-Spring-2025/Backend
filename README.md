@@ -74,15 +74,15 @@ There is also an option in the API request to add pre-written instructions for t
 'system': 'You are a chatbot meant to teach geography. Any answer to a question should be accompanied by a description of where in the world the relevant place is.',
 ```
 
-### Running the Full Pipeline
+## Running the Full Pipeline
 
-## Here is the full pipeline
+### Here is the full pipeline
 1. Take in a user prompt
 2. Convert it to a Cypher query using your LLaMA API
 3. Run that query on your Neo4j database
 4. Print the final answer
 
-## llama_to_neo4j.py
+### llama_to_neo4j.py
 Navigate to the Llama directory and run the following command:
 ```bash
 python llama_to_neo4j
