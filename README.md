@@ -77,10 +77,10 @@ There is also an option in the API request to add pre-written instructions for t
 ## Running the Full Pipeline
 
 ### Here is the full pipeline
-1. Take in a user prompt
-2. Convert it to a Cypher query using your LLaMA API
-3. Run that query on your Neo4j database
-4. Print the final answer
+1. Takes in a user prompt
+2. Converts it to a Cypher query using LLaMA API
+3. Runs that query on the Neo4j database
+4. Prints the final answer
 
 ### llama_to_neo4j.py
 Navigate to the Llama directory and run the following command:
