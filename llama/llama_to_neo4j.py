@@ -1,8 +1,17 @@
 import requests
+import os
+from neo4j import GraphDatabase
 
-# CONFIGURATION
+# ========== Config ==========
+
+#Neo4j Config
+NEO4J_URL = "bolt://localhost:7687"
+NEO4J_USER = "neo4j"
+NEO4J_PASSWORD = "cheerios4150"
+
+# Llama Config
 API_URL = "https://api.llms.afterhoursdev.com/completions"
-API_KEY = "a509790793f9864cbe4b3fdb1aab0c44169ae5c780dab12a96ad7824f7d5a78f"
+API_KEY = os.environ.get("LLAMA_API_KEY")
 SESSION_TOKEN = ""
 
 MODEL_NAME = "meta-llama3.3-70b"
@@ -11,8 +20,8 @@ TEMPERATURE = 0.5
 TOP_P = 0.9
 MAX_GEN_LEN = 512
 
+# ========== Prompt Template ==========
 
-# STEP 1: Enron Schema → Prompt Template
 def make_prompt_enron(user_question: str) -> str:
     return f"""
 You are a Cypher query expert working with a Neo4j graph database.
@@ -39,8 +48,8 @@ User question: "{user_question}"
 Cypher query:
 """
 
+# ========== Calling the Llama model ==========
 
-# STEP 2: Call the LLaMA model
 def query_llama(prompt: str) -> str:
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -67,15 +76,41 @@ def query_llama(prompt: str) -> str:
 
     return data.get("generation", "").strip()
 
-# STEP 3: Run the full pipeline
+# ========== Neo4j Query Runner ==========
+
+def run_cypher_query(query: str):
+    driver = GraphDatabase.driver(NEO4J_URL, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    with driver.session() as session:
+        try:
+            result = session.run(query)
+            data = result.data()
+            return data
+        except Exception as e:
+            print("Neo4j query error:", e)
+            return None
+
+# ========== Main Program ==========
+
 def main():
-    user_question = input("Enter your natural language question: ")
+    user_question = input("Enter your question: ")
     prompt = make_prompt_enron(user_question)
     cypher_query = query_llama(prompt)
 
-    print("\nGenerated Cypher Query:")
-    print(cypher_query)
+    print("\nGenerated Cypher Query:\n", cypher_query)
 
+    if not cypher_query.lower().startswith("match"):
+        print("⚠️ Query might not be valid — skipping Neo4j run.")
+        return
+
+    print("\nQuerying Neo4j...")
+    results = run_cypher_query(cypher_query)
+
+    print("\nResults:")
+    if results:
+        for row in results:
+            print(row)
+    else:
+        print("No results or error occurred.")
 
 if __name__ == "__main__":
     main()

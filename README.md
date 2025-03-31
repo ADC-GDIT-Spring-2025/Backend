@@ -45,7 +45,7 @@ Open a browser and go to `http://localhost:7474`
 
 
 ## Testing the Llama chatbot for backend use
-There is a Python script called `test_llama.py` which is used to test a successful connection to our llama model.
+There is a Python script called `test_llama.py` within the Llama folder which is used to test a successful connection to our llama model.
 
 ### Setup for the script
 - Make sure you have the virtual environment activated by running the bash command at the top of this README.
@@ -73,3 +73,19 @@ There is also an option in the API request to add pre-written instructions for t
 ```python
 'system': 'You are a chatbot meant to teach geography. Any answer to a question should be accompanied by a description of where in the world the relevant place is.',
 ```
+
+### Running the Full Pipeline
+
+## Here is the full pipeline
+1. Take in a user prompt
+2. Convert it to a Cypher query using your LLaMA API
+3. Run that query on your Neo4j database
+4. Print the final answer
+
+## llama_to_neo4j.py
+Navigate to the Llama directory and run the following command:
+```bash
+python llama_to_neo4j
+```
+It will prompt you for your query and then return the generated cypher script and the result from the Neo4j database of running that script.
+Then we can send this result to the frontend as part of the context for the final response. 
