@@ -2,3 +2,10 @@
 venv
 data
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+user_data/
