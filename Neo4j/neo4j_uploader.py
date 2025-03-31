@@ -107,7 +107,7 @@ def main():
             if sender_id is not None and sender_id in users_data.values():
                 session.execute_write(create_relationship_sent, sender_id, email_id)
 
-            for rec in message.get("recipient", []):
+            for rec in message.get("recipients", []):
                 if rec in users_data.values():
                     session.execute_write(create_relationship_received, email_id, rec)
 

@@ -21,7 +21,7 @@ def query_neo4j():
     # Run the pipeline on the prompt
     results = process_prompt(prompt)
 
-    return flask.jsonify(results)
+    return { data: flask.jsonify(results) }
 
 
 if __name__ == '__main__':
