@@ -16,12 +16,12 @@ def create_person(tx, person_id, email):
     """
     tx.run(query, person_id=person_id, email=email)
 
-def create_email(tx, email_id, time, thread, body):
+def create_email(tx, email_id, time, thread, body, filepath):
     query = """
     MERGE (e:Email {id: $email_id})
-    SET e.time = $time, e.thread = $thread, e.body = $body
+    SET e.time = $time, e.thread = $thread, e.body = $body, e.filepath = $filepath
     """
-    tx.run(query, email_id=email_id, time=time, thread=thread, body=body)
+    tx.run(query, email_id=email_id, time=time, thread=thread, body=body, filepath=filepath)
 
 def create_relationship_sent(tx, person_id, email_id):
     query = """
@@ -51,21 +51,31 @@ def create_relationship_received_bcc(tx, email_id, person_id):
     """
     tx.run(query, email_id=email_id, person_id=person_id)
 
-def main():
-    # Check for command line arguments for maximum emails and maximum users to process
-    if len(sys.argv) < 3:
-        print("Usage: python neo4j_importer.py <max_emails> <max_users>")
-        sys.exit(1)
-    
-    try:
-        max_emails = int(sys.argv[1])
-        max_users = int(sys.argv[2])
-    except ValueError:
-        print("Invalid value provided for max_emails or max_users. Please provide integers.")
-        sys.exit(1)
 
-    users_url = f'http://localhost:5002/users?limit={max_users}'
-    messages_url = f'http://localhost:5002/messages?limit={max_emails}'
+
+def main():
+    limit_data = False
+    
+    # Check for command line arguments for maximum emails and maximum users to process
+    if len(sys.argv) != 1 and len(sys.argv) != 3:
+        print("Usage: \n\tpython neo4j_uploader.py \n\tpython neo4j_uploader.py <max_emails> <max_users>")
+        sys.exit(1)
+    elif len(sys.argv) == 3:
+        try:
+            max_emails = int(sys.argv[1])
+            max_users = int(sys.argv[2])
+            limit_data = True
+        except ValueError:
+            print("Invalid value provided for max_emails or max_users. Please provide integers.")
+            sys.exit(1)
+    
+
+    if limit_data:
+        users_url = f'http://localhost:5002/users?limit={max_users}'
+        messages_url = f'http://localhost:5002/messages?limit={max_emails}'
+    else:
+        users_url = 'http://localhost:5002/users'
+        messages_url = f'http://localhost:5002/messages'
 
     users_data = requests.get(users_url, stream=True).json()
     messages_data = requests.get(messages_url, stream=True).json()
@@ -89,24 +99,25 @@ def main():
             time_ = message.get("time", "")
             thread = message.get("thread", "")
             body = message.get("message", "")
+            filepath = message.get("filepath", "")
 
-            session.write_transaction(create_email, email_id, time_, thread, body)
+            session.execute_write(create_email, email_id, time_, thread, body, filepath)
 
             sender_id = message.get("sender")
             if sender_id is not None and sender_id in users_data.values():
-                session.write_transaction(create_relationship_sent, sender_id, email_id)
+                session.execute_write(create_relationship_sent, sender_id, email_id)
 
             for rec in message.get("recipient", []):
                 if rec in users_data.values():
-                    session.write_transaction(create_relationship_received, email_id, rec)
+                    session.execute_write(create_relationship_received, email_id, rec)
 
             for cc in message.get("cc", []):
                 if cc in users_data.values():
-                    session.write_transaction(create_relationship_received_cc, email_id, cc)
+                    session.execute_write(create_relationship_received_cc, email_id, cc)
 
             for bcc in message.get("bcc", []):
                 if bcc in users_data.values():
-                    session.write_transaction(create_relationship_received_bcc, email_id, bcc)
+                    session.execute_write(create_relationship_received_bcc, email_id, bcc)
 
     driver.close()
     print("Data import complete.")

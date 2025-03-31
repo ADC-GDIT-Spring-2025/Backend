@@ -29,12 +29,12 @@ git clone https://github.com/ADC-GDIT-Spring-2025/ETL # for HTTPS
 git clone git@github.com:ADC-GDIT-Spring-2025/ETL.git # for SSH
 ```
 - run the setup scripts as detailed in the README.md file in the ETL repository
-- the server should be running on `http://localhost:5000`
+- the server should be running on `http://localhost:5002`
 
 Then run the following command:
 ```bash
 source venv/bin/activate # Activate the virtual environment if not already activated
-python neo4j_uploader.py <max_emails> <max_users>
+python Neo4j/neo4j_uploader.py <max_emails> <max_users>
 ```
 
 ### Viewing the Neo4j Graph
