@@ -16,12 +16,12 @@ def create_person(tx, person_id, email):
     """
     tx.run(query, person_id=person_id, email=email)
 
-def create_email(tx, email_id, time, thread, body):
+def create_email(tx, email_id, time, thread, body, filepath):
     query = """
     MERGE (e:Email {id: $email_id})
-    SET e.time = $time, e.thread = $thread, e.body = $body
+    SET e.time = $time, e.thread = $thread, e.body = $body, e.filepath = $filepath
     """
-    tx.run(query, email_id=email_id, time=time, thread=thread, body=body)
+    tx.run(query, email_id=email_id, time=time, thread=thread, body=body, filepath=filepath)
 
 def create_relationship_sent(tx, person_id, email_id):
     query = """
@@ -99,24 +99,25 @@ def main():
             time_ = message.get("time", "")
             thread = message.get("thread", "")
             body = message.get("message", "")
+            filepath = message.get("filepath", "")
 
-            session.write_transaction(create_email, email_id, time_, thread, body)
+            session.execute_write(create_email, email_id, time_, thread, body, filepath)
 
             sender_id = message.get("sender")
             if sender_id is not None and sender_id in users_data.values():
-                session.write_transaction(create_relationship_sent, sender_id, email_id)
+                session.execute_write(create_relationship_sent, sender_id, email_id)
 
             for rec in message.get("recipient", []):
                 if rec in users_data.values():
-                    session.write_transaction(create_relationship_received, email_id, rec)
+                    session.execute_write(create_relationship_received, email_id, rec)
 
             for cc in message.get("cc", []):
                 if cc in users_data.values():
-                    session.write_transaction(create_relationship_received_cc, email_id, cc)
+                    session.execute_write(create_relationship_received_cc, email_id, cc)
 
             for bcc in message.get("bcc", []):
                 if bcc in users_data.values():
-                    session.write_transaction(create_relationship_received_bcc, email_id, bcc)
+                    session.execute_write(create_relationship_received_bcc, email_id, bcc)
 
     driver.close()
     print("Data import complete.")
