@@ -22,7 +22,7 @@ MAX_GEN_LEN = 512
 
 # ========== Prompt Template ==========
 # note: the email formatting is not consistent. we need to either exclude that part of the template or figure out a more flexible option
-def make_prompt_enron(user_question: str) -> str:
+def apply_template(user_question: str) -> str:
     return f"""
 You are a Cypher query expert working with a Neo4j graph database.
 
@@ -92,9 +92,8 @@ def run_cypher_query(query: str):
 
 # ========== Main Program ==========
 
-def main():
-    user_question = input("Enter your question: ")
-    prompt = make_prompt_enron(user_question)
+def process_prompt(prompt: str):
+    full_prompt = apply_template(prompt)
     cypher_query = query_llama(prompt)
 
     print("\nGenerated Cypher Query:\n", cypher_query)
@@ -113,5 +112,9 @@ def main():
     else:
         print("No results or error occurred.")
 
+    return results
+
+
 if __name__ == "__main__":
-    main()
+    prompt = input("Enter your question: ")
+    process_prompt(prompt)

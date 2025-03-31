@@ -2,3 +2,5 @@ requests>=2.31.0
 neo4j==5.14.1
 python-dateutil==2.8.2
 tqdm==4.66.1
+flask==3.0.2
+flask_cors==5.0.1
