@@ -21,7 +21,7 @@ TOP_P = 0.9
 MAX_GEN_LEN = 512
 
 # ========== Prompt Template ==========
-
+# note: the email formatting is not consistent. we need to either exclude that part of the template or figure out a more flexible option
 def make_prompt_enron(user_question: str) -> str:
     return f"""
 You are a Cypher query expert working with a Neo4j graph database.
@@ -72,7 +72,6 @@ def query_llama(prompt: str) -> str:
     response.raise_for_status()
 
     data = response.json()
-    print("\n[DEBUG] Full API Response:", data)
 
     return data.get("generation", "").strip()
 
@@ -88,6 +87,8 @@ def run_cypher_query(query: str):
         except Exception as e:
             print("Neo4j query error:", e)
             return None
+        finally:
+            driver.close()
 
 # ========== Main Program ==========
 
