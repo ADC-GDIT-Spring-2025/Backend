@@ -3,7 +3,7 @@
 ## Setup
 ```bash
 chmod +x setup_venv.sh
-./setup_venv.sh
+source ./setup_venv.sh
 ```
 
 ## Neo4j Graph Setup
@@ -42,3 +42,34 @@ Open a browser and go to `http://localhost:7474`
 - Enter the username and password (neo4j/cheerios4150)
 - Enter the command `MATCH (n) RETURN n` in the console at the top to get all nodes in the graph
 - Click on the `Graph` tab (on the left) to view the graph
+
+
+## Testing the Llama chatbot for backend use
+There is a Python script called `test_llama.py` which is used to test a successful connection to our llama model.
+
+### Setup for the script
+- Make sure you have the virtual environment activated by running the bash command at the top of this README.
+- Save the llama API key in your environment variables as `LLAMA_API_KEY`:
+```bash
+# For mac:
+export LLAMA_API_KEY=<your_llama_api_key_here>
+
+# For windows CMD:
+setx LLAMA_API_KEY=<your_llama_api_key_here>
+# For windows PowerShell:
+$env:LLAMA_API_KEY = "<your_llama_api_key_here>"
+```
+- Run the Python script:
+```bash
+python test_llama.py
+```
+
+### Usage
+The script will prompt you to enter a message to send to the llama model. The model will then respond with a message.
+
+You can analyze and modify the python code to change the context. You can see that the `thread` variable stores the context for the current chat.
+
+There is also an option in the API request to add pre-written instructions for the chatbot to apply to all prompts:
+```python
+'system': 'You are a chatbot meant to teach geography. Any answer to a question should be accompanied by a description of where in the world the relevant place is.',
+```

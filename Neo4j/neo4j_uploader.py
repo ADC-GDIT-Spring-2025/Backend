@@ -5,7 +5,7 @@ from neo4j import GraphDatabase
 import time
 
 # Neo4j connection details (adjust these as needed)
-URI = "bolt://localhost:7687"
+URL = "bolt://localhost:7687"
 USERNAME = "neo4j"
 PASSWORD = "cheerios4150"
 
@@ -80,7 +80,7 @@ def main():
     users_data = requests.get(users_url, stream=True).json()
     messages_data = requests.get(messages_url, stream=True).json()
 
-    driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
+    driver = GraphDatabase.driver(URL, auth=(USERNAME, PASSWORD))
     with driver.session() as session:
         # Start timing the node upload
         start_time = time.time()
