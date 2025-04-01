@@ -94,7 +94,7 @@ def run_cypher_query(query: str):
 
 def process_prompt(prompt: str):
     full_prompt = apply_template(prompt)
-    cypher_query = query_llama(prompt)
+    cypher_query = query_llama(full_prompt)
 
     print("\nGenerated Cypher Query:\n", cypher_query)
 

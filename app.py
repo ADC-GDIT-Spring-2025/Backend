@@ -1,4 +1,4 @@
-from llama.llama_to_neo4j import process_prompt
+from Llama.llama_to_neo4j import process_prompt
 import flask
 import json
 from flask_cors import CORS
@@ -15,13 +15,18 @@ def index():
 
 @app.route('/neo4j', methods=['POST'])
 def query_neo4j():
-    data = flask.request.get_json()
-    prompt = data.get("prompt")
-    
-    # Run the pipeline on the prompt
-    results = process_prompt(prompt)
+    try:
+        prompt = flask.request.data.decode('utf-8').strip()
 
-    return { data: flask.jsonify(results) }
+        if not prompt:
+            return flask.jsonify({ "error": "No prompt provided" }), 400
+
+        results = process_prompt(prompt)
+        return flask.jsonify({ "results": results })
+
+    except Exception as e:
+        return flask.jsonify({ "error": str(e) }), 500
+
 
 
 if __name__ == '__main__':
