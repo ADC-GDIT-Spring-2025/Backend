@@ -136,23 +136,24 @@ def get_all_vectors():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/list_ids", methods=["GET"])
+@app.route("/list_vectors", methods=["GET"])
 def list_ids():
     """Get all vector IDs in the Qdrant collection."""
     try:
         # Perform the search or scroll with a limit
         search_results = qdrant.scroll(
             collection_name=COLLECTION_NAME,
-            limit=100  # Increase the limit if needed
+            limit=100,  # Increase the limit if needed
+            with_vectors=True
         )
         
         # Log the output to see the structure of search_results
         print(search_results)
         
         # Assuming search_results contains 'matches' or similar field
-        ids = [record.id for record in search_results['result']]  # Adjust based on the structure
+        vectors = [record.vector for record in search_results[0]]  # Adjust based on the structure
         
-        return jsonify({"ids": ids})
+        return jsonify({"vectors": vectors})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
