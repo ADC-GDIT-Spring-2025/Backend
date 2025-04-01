@@ -6,6 +6,30 @@ chmod +x setup_venv.sh
 source ./setup_venv.sh
 ```
 
+### Email Dataset Processing
+This is done through the `util/enron_parser.py` module, which allows you to parse email files and extract relevant information such as users, messages, and threads.
+
+### Usage
+To process the email dataset, run the following command:
+```bash
+python util/enron_parser.py <path_to_maildir>
+```
+Replace `<path_to_maildir>` with the path to the directory containing the Enron email files.
+
+### Neo4j Integration
+After processing the emails, you can upload the parsed data to a Neo4j database using the `Neo4j/neo4j_uploader.py` script. This script allows you to limit the number of emails and users processed.
+
+#### Usage
+To upload the data to Neo4j, run:
+```bash
+python Neo4j/neo4j_uploader.py <max_emails> <max_users>
+```
+- `<max_emails>`: Optional limit on the number of emails to process.
+- `<max_users>`: Optional limit on the number of users to process.
+
+This will create nodes for users and emails in the Neo4j database, establishing relationships based on email interactions.
+
+
 ## Neo4j Graph Setup
 First make sure you have a local instance of Neo4j RUNNING:
 - Download Neo4j Desktop from [here](https://neo4j.com/download/)
