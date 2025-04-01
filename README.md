@@ -32,7 +32,7 @@ If you want to ensure that the parsed dataset has been pulled from LFS, run:
 git lfs pull
 ```
 
-2. ## Install the required Python packages (recommended to insteall in a venv):
+2. ## Install the required Python packages (recommended to install in a venv):
 ```bash
 # create and activate the venv
 python3 -m venv .venv
