@@ -27,7 +27,7 @@ qdrant.create_collection(
 def insert_embeddings():
     """Insert precomputed embeddings into Qdrant"""
     try:
-        embeddings = np.load("embeddings.npy")
+        embeddings = np.load("embeddings (1).npy")
         num_vectors, dim = embeddings.shape
 
         points = [
@@ -49,7 +49,8 @@ def search(vector_id):
         # Fetch the vector corresponding to the given vector_id using 'retrieve'
         result = qdrant.retrieve(
             collection_name=COLLECTION_NAME,
-            ids=[vector_id]
+            ids=[vector_id],
+            with_vectors = True
         )
 
         # Check if the result is empty or doesn't contain the expected data
@@ -73,10 +74,13 @@ def search(vector_id):
         hits = qdrant.search(
             collection_name=COLLECTION_NAME,
             query_vector=query_vector,  # Use the fetched vector here
-            limit=5
+            limit=5,
+            with_vectors = True
         )
 
-        return jsonify({"message": f"Found these vectors: {hits}"})
+        formatted_hits = [{"id": hit.id, "score": hit.score} for hit in hits]
+
+        return jsonify({"results": f"{formatted_hits}"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -143,12 +147,9 @@ def list_ids():
         # Perform the search or scroll with a limit
         search_results = qdrant.scroll(
             collection_name=COLLECTION_NAME,
-            limit=100,  # Increase the limit if needed
-            with_vectors=True
+            limit=100,
+            with_vectors = True
         )
-        
-        # Log the output to see the structure of search_results
-        print(search_results)
         
         # Assuming search_results contains 'matches' or similar field
         vectors = [record.vector for record in search_results[0]]  # Adjust based on the structure
