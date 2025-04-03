@@ -9,6 +9,23 @@ This module stores the dataset in the data/maildir/ directory, in which there ar
 '''
 
 def extract_data_from_source():
+    """
+    Download and extract the Enron email dataset from CMU servers.
+    
+    This function:
+    1. Checks if the dataset already exists to avoid duplicate downloads
+    2. Creates a data directory if it doesn't exist
+    3. Downloads the Enron dataset (~423MB) with progress tracking
+    4. Extracts the tar.gz file into the data directory
+    5. Optionally removes the tar.gz file to save disk space
+    
+    Returns:
+        str: Absolute path to the data directory where files were extracted
+        
+    Note:
+        This function should only be run once to set up the dataset.
+        The extracted dataset is approximately 1.7GB in size.
+    """
     import requests
     import tarfile
     import os
@@ -34,10 +51,13 @@ def extract_data_from_source():
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
     
+    # Stream the download with progress tracking
     with open(tar_file_path, 'wb') as file:
         if total_size == 0:
+            # If content-length header is missing, download without progress tracking
             file.write(response.content)
         else:
+            # Download with progress bar
             downloaded = 0
             for data in response.iter_content(chunk_size=8192):
                 downloaded += len(data)
@@ -46,7 +66,7 @@ def extract_data_from_source():
                 print(f"\rDownload progress: [{'=' * progress}{' ' * (50-progress)}] {downloaded}/{total_size} bytes", end='')
     
     print("\nExtracting files...")
-    # Extract the tar.gz file
+    # Extract the tar.gz file to the data directory
     with tarfile.open(tar_file_path, 'r:gz') as tar:
         tar.extractall(path=data_dir)
     
