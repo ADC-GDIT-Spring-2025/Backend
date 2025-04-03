@@ -1,54 +1,69 @@
 # Enron Email Dataset to Neo4j
 
-This project helps you import the Enron email dataset into a Neo4j graph database for the App Dev GDIT/Praxis project.
-# Setup
-
-1. ## Setup Git LFS and clone the repository
-If you're on Mac, you can install Git LFS using Homebrew:
+## Setup
 ```bash
-brew install git-lfs
+# setup the virtual environment, installing dependencies
+chmod +x setup_venv.sh
+
+# activate the virtual environment
+source ./setup_venv.sh
+
+# download and parse the dataset 
+./etl_parse.sh
 ```
-If you're on Windows, git-lfs comes with Git for Windows.
+**NOTE: DO NOT DELETE THE DATASET OR THE PARSED FILES LATER, AS IT TAKES A LONG TIME TO GENERATE**
 
-Then, initialize git lfs on your user account:
+### Neo4j Setup
+First make sure you have a local instance of Neo4j RUNNING:
+- Download Neo4j Desktop from [here](https://neo4j.com/download/)
+- Create a new instance called EmailMiner
+- Set the password to `cheerios4150`
+- Start the instance
+#### To verify that Neo4j is running locally:
+- Open a browser and go to `http://localhost:7474`
+- Enter the username and password (neo4j/cheerios4150)
+- Enter the command `MATCH (n) RETURN n` to get all nodes/relationships in the graph
+- Enter the command `MATCH (n) DETACH DELETE n` to get rid of all nodes/relationships in the graph
+
+#### To populate the graph with the Enron email dataset:
 ```bash
-git lfs install
-```
-
-Then, clone the repository OR pull the latest changes:
-```bash
-# cloning
-git clone https://github.com/ADC-GDIT-Spring-2025/Backend.git   # for HTTPS
-git clone git@github.com:ADC-GDIT-Spring-2025/Backend.git       # for SSH
-git checkout origin/data-pipeline
-
-# pulling latest changes
-git pull
-```
-If you have git lfs setup, the parsed dataset from LFS should automatically be pulled with the normal changes.
-
-If you want to ensure that the parsed dataset has been pulled from LFS, run:
-```bash
-git lfs pull
+python Neo4j/neo4j_uploader.py <max_emails> <max_users>
 ```
 
-2. ## Install the required Python packages (recommended to install in a venv):
+#### Viewing the Neo4j Graph
+Open a browser and go to `http://localhost:7474`
+- Enter the username and password (neo4j/cheerios4150)
+- Enter the command `MATCH (n) RETURN n` in the console at the top to get all nodes in the graph
+- Click on the `Graph` tab (on the left) to view the graph
+
+### Setup for the full pipeline
+A short description of the pipeline:
+1. Takes in a user prompt
+2. Converts it to a Cypher query using LLaMA API
+3. Runs that query on the Neo4j database
+4. Prints the final answer
+
+STEPS TO SETUP THE PIPELINE:
+- Make sure you have the virtual environment activated by running the bash command at the top of this README.
+- Save the llama API key in your environment variables as `LLAMA_API_KEY`:
 ```bash
-# create and activate the venv
-python3 -m venv .venv
+# For mac:
+export LLAMA_API_KEY=<your_llama_api_key_here>
 
-# or, if you want to use a specific python version like 3.11 (if you have it installed)
-python3.11 -m venv .venv
-
-# activate the venv
-source .venv/bin/activate
-
-# install the required packages
-pip install -r requirements.txt
+# For windows CMD:
+setx LLAMA_API_KEY=<your_llama_api_key_here>
+# For windows PowerShell:
+$env:LLAMA_API_KEY = "<your_llama_api_key_here>"
 ```
 
+#### Running the Pipeline
+If you have the frontend set up, you can start the backend server by running:
+```bash
+python app.py
+```
 
-### Notes
-the `util/deprecated` directory contains scripts that attempt to manually parse the Enron email dataset.
-- `fetch_data.py` is a script to get the __raw enron email dataset__ from the internet, and it __should only be run once!__
-- `old_parser.py` and `node_models.py` are files that attempt to parse the raw dataset into custom Python objects. These are __deprecated__ and __should not be used__, as we are now parsing the dataset into json files.
+If you don't have the frontend set up, you can run the pipeline directly from the command line:
+```bash
+python llama/llama_to_neo4j.py
+```
+It will prompt you for your query and then generate a cypher script and the print result from the Neo4j database of running that script.
