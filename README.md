@@ -2,80 +2,48 @@
 
 ## Setup
 ```bash
+# setup the virtual environment, installing dependencies
 chmod +x setup_venv.sh
+
+# activate the virtual environment
 source ./setup_venv.sh
+
+# download and parse the dataset 
+./etl_parse.sh
 ```
+**NOTE: DO NOT DELETE THE DATASET OR THE PARSED FILES LATER, AS IT TAKES A LONG TIME TO GENERATE**
 
-### Email Dataset Processing
-This is done through the `util/enron_parser.py` module, which allows you to parse email files and extract relevant information such as users, messages, and threads.
-
-### Usage
-To process the email dataset, run the following command:
-```bash
-python util/enron_parser.py <path_to_maildir>
-```
-Replace `<path_to_maildir>` with the path to the directory containing the Enron email files.
-
-### Neo4j Integration
-After processing the emails, you can upload the parsed data to a Neo4j database using the `Neo4j/neo4j_uploader.py` script. This script allows you to limit the number of emails and users processed.
-
-#### Usage
-To upload the data to Neo4j, run:
-```bash
-python Neo4j/neo4j_uploader.py <max_emails> <max_users>
-```
-- `<max_emails>`: Optional limit on the number of emails to process.
-- `<max_users>`: Optional limit on the number of users to process.
-
-This will create nodes for users and emails in the Neo4j database, establishing relationships based on email interactions.
-
-
-## Neo4j Graph Setup
+### Neo4j Setup
 First make sure you have a local instance of Neo4j RUNNING:
 - Download Neo4j Desktop from [here](https://neo4j.com/download/)
 - Create a new instance called EmailMiner
 - Set the password to `cheerios4150`
 - Start the instance
-### To verify that Neo4j is running locally:
+#### To verify that Neo4j is running locally:
 - Open a browser and go to `http://localhost:7474`
 - Enter the username and password (neo4j/cheerios4150)
 - Enter the command `MATCH (n) RETURN n` to get all nodes/relationships in the graph
 - Enter the command `MATCH (n) DETACH DELETE n` to get rid of all nodes/relationships in the graph
 
-### To populate the graph with the Enron email dataset:
-First make sure the ETL data server is running:
-- clone the ETL repository:
+#### To populate the graph with the Enron email dataset:
 ```bash
-git clone https://github.com/ADC-GDIT-Spring-2025/ETL # for HTTPS
-
-# OR:
-
-git clone git@github.com:ADC-GDIT-Spring-2025/ETL.git # for SSH
-```
-- run the setup scripts as detailed in the README.md file in the ETL repository
-- the server should be running on `http://localhost:5002`
-
-Then run the following command:
-```bash
-source venv/bin/activate # Activate the virtual environment if not already activated
 python Neo4j/neo4j_uploader.py <max_emails> <max_users>
 ```
 
-### Viewing the Neo4j Graph
+#### Viewing the Neo4j Graph
 Open a browser and go to `http://localhost:7474`
 - Enter the username and password (neo4j/cheerios4150)
 - Enter the command `MATCH (n) RETURN n` in the console at the top to get all nodes in the graph
 - Click on the `Graph` tab (on the left) to view the graph
 
-## Running the Full Pipeline
-
-### Here is the full pipeline
+### Setup for the full pipeline
+A short description of the pipeline:
 1. Takes in a user prompt
 2. Converts it to a Cypher query using LLaMA API
 3. Runs that query on the Neo4j database
 4. Prints the final answer
 
-### Setup for the script
+STEPS TO SETUP THE PIPELINE:
 - Make sure you have the virtual environment activated by running the bash command at the top of this README.
 - Save the llama API key in your environment variables as `LLAMA_API_KEY`:
 ```bash
@@ -87,15 +55,15 @@ setx LLAMA_API_KEY=<your_llama_api_key_here>
 # For windows PowerShell:
 $env:LLAMA_API_KEY = "<your_llama_api_key_here>"
 ```
-- Run the Python script:
+
+#### Running the Pipeline
+If you have the frontend set up, you can start the backend server by running:
 ```bash
-python test_llama.py
+python app.py
 ```
 
-### llama_to_neo4j.py
-Run the following command:
+If you don't have the frontend set up, you can run the pipeline directly from the command line:
 ```bash
 python llama/llama_to_neo4j.py
 ```
-It will prompt you for your query and then return the generated cypher script and the result from the Neo4j database of running that script.
-Then we can send this result to the frontend as part of the context for the final response. 
+It will prompt you for your query and then generate a cypher script and the print result from the Neo4j database of running that script.
