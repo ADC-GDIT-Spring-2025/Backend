@@ -35,8 +35,12 @@ def index():
 
 @app.route('/', methods=['POST'])
 def route():
+    # print(f'RECIEVED REQUEST: {flask.request.json}')
+
+
     try:
         prompt = flask.request.json.get('prompt', '').strip()
+        print(f'prompt: {prompt}')
 
         thread.append({
             'role': 'user',
@@ -47,15 +51,23 @@ def route():
             return flask.jsonify({ "error": "No prompt provided" }), 400
 
         neo4j_data = process_prompt(prompt)
+        print(f"neo4j_data: {neo4j_data}")
+        
+        
         qdrant_data = query_qdrant(prompt)
+        print(f"qdrant_data: {qdrant_data}")
 
+        print("Applying template...")
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data)
+        print(f"final_prompt: {final_prompt}")
 
-        final_response = query_llama(final_prompt)
+        final_response = query_llama()
+        # print(f"final_response: {final_response}")
 
         return flask.jsonify({ "llm_response": final_response })
 
     except Exception as e:
+        print("Error:", str(e))
         return flask.jsonify({ "error": str(e) }), 500
 
 
@@ -71,9 +83,9 @@ def query_neo4j(prompt: str) -> str:
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     # template = f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
-    template = f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\n\n'
+    return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\n\n' 
 
-def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
+def query_llama(model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
     response = requests.post('https://api.llms.afterhoursdev.com/chat/completions',
                            headers={
                                'Content-Type': 'application/json',

@@ -20,10 +20,8 @@ TEMPERATURE = 0.5
 TOP_P = 0.9
 MAX_GEN_LEN = 512
 
-# ========== Prompt Template ==========
-# note: the email formatting is not consistent. we need to either exclude that part of the template or figure out a more flexible option
-def apply_template(user_question: str) -> str:
-    return f"""
+
+TEMPLATE_INTRO = """
 You are a Cypher query expert working with a Neo4j graph database.
 
 Graph schema:
@@ -39,14 +37,47 @@ Relationships:
 (:Person)<-[:RECEIVED_BCC]-(:Email)
 (:Email)-[:REPLY]->(:Email)
 (:Email)-[:FORWARD]->(:Email)
+"""
+
+# ========== Prompt Template ==========
+# note: the email formatting is not consistent. we need to either exclude that part of the template or figure out a more flexible option
+def apply_template(user_question: str) -> str:
+    return f"""{TEMPLATE_INTRO}
 
 Translate the user's question into a Cypher query using the schema above.
-Do NOT include explanations or formatting — only return the Cypher query.
+If you need to perform multiple match statements, combine them into one query.
+Do NOT include explanations or formatting — only return the Cypher query. 
+Your resposne should start with "match" and be a valid Cypher query.
+Only provide ONE Cypher query, do not provide multiple queries or options.
 
 User question: "{user_question}"
 
 Cypher query:
 """
+
+def apply_error_template(user_question: str, cypher_query: str, error_msg: str = "") -> str:
+    if error_msg != "":
+        error_msg = "Error message: " + error_msg
+
+
+    return f"""{TEMPLATE_INTRO}
+
+The previous attempt to generate a Cypher query for this question failed:
+Question: "{user_question}"
+Failed query: {cypher_query}
+{error_msg}
+
+Generate a new, corrected Cypher query that:
+1. Must start with 'match'
+2. Must be syntactically valid
+3. Must use the schema exactly as shown above
+4. Must answer the original question
+
+Return ONLY the corrected Cypher query with no explanations or additional text.
+
+Cypher query:
+"""
+
 
 # ========== Calling the Llama model ==========
 
@@ -86,7 +117,7 @@ def run_cypher_query(query: str) -> str:
             return data
         except Exception as e:
             print("Neo4j query error:", e)
-            return None
+            return "Neo4j query error: " + str(e)
         finally:
             driver.close()
 
@@ -96,21 +127,35 @@ def process_prompt(prompt: str) -> str:
     full_prompt = apply_template(prompt)
     cypher_query = query_llama(full_prompt)
 
-    print("\nGenerated Cypher Query:\n", cypher_query)
+    max_tries = 3
+    tries = 0
+    while tries < max_tries:
+        print("\nGenerated Cypher Query:\n", cypher_query)
 
-    if not cypher_query.lower().startswith("match"):
-        print("⚠️ Query might not be valid — skipping Neo4j run.")
-        return
-
-    print("\nQuerying Neo4j...")
-    results = run_cypher_query(cypher_query)
+        if not cypher_query.startswith("match"):
+            print("⚠️ Cypher query does not start with 'match' — trying again.")
+            full_prompt = apply_error_template(prompt, cypher_query)
+            cypher_query = query_llama(full_prompt)
+            tries += 1
+            continue
+        print("\nQuerying Neo4j...")
+        results = run_cypher_query(cypher_query)
+        if results is None or str(results).startswith("Neo4j query error"):
+            print("⚠️ Neo4j query error or invalid query — trying again.")
+            full_prompt = apply_error_template(prompt, cypher_query, results)
+            cypher_query = query_llama(full_prompt)
+            tries += 1
+        else:
+            break
 
     print("\nResults:")
+    # the results from neo4j is a list of dicts, where each dict is a row of data
     if results:
         for row in results:
             print(row)
     else:
         print("No results or error occurred.")
+        results = ""
 
     return results
 
