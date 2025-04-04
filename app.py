@@ -36,7 +36,7 @@ def index():
 @app.route('/', methods=['POST'])
 def route():
     try:
-        prompt = flask.request.data.decode('utf-8').strip()
+        prompt = flask.request.json.get('prompt', '').strip()
 
         thread.append({
             'role': 'user',
