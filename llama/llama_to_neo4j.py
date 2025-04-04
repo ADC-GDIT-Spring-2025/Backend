@@ -77,7 +77,7 @@ def query_llama(prompt: str) -> str:
 
 # ========== Neo4j Query Runner ==========
 
-def run_cypher_query(query: str):
+def run_cypher_query(query: str) -> str:
     driver = GraphDatabase.driver(NEO4J_URL, auth=(NEO4J_USER, NEO4J_PASSWORD))
     with driver.session() as session:
         try:
@@ -92,7 +92,7 @@ def run_cypher_query(query: str):
 
 # ========== Main Program ==========
 
-def process_prompt(prompt: str):
+def process_prompt(prompt: str) -> str:
     full_prompt = apply_template(prompt)
     cypher_query = query_llama(full_prompt)
 
