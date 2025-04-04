@@ -16,7 +16,7 @@ SYSTEM_PROMPT="""
     If relevant data is available, incorporate it naturally into your response without explicitly stating its source.  
 
     Your response should:  
-    1. **Present information clearly and conversationally**, avoiding any mention of databases, queries, or file formats.  
+    1. **Present information clearly and conversationally**, avoiding any mention of databases, queries, file formats, email or person or thread ids, or filepaths.  
     2. **Seamlessly integrate retrieved data** with your general knowledge to provide insightful and well-structured answers.  
     3. **Indicate when a response is based purely on AI knowledge**, particularly if no supporting data is available.  
     4. **Use markdown for formatting** when presenting structured information (e.g., lists, summaries).  
@@ -35,33 +35,25 @@ def index():
 
 @app.route('/', methods=['POST'])
 def route():
-    # print(f'RECIEVED REQUEST: {flask.request.json}')
-
-
     try:
         prompt = flask.request.json.get('prompt', '').strip()
-        print(f'prompt: {prompt}')
-
-        thread.append({
-            'role': 'user',
-            'message': prompt
-        })
+        print(f'RECIEVED PROMPT: {prompt}')
 
         if not prompt:
             return flask.jsonify({ "error": "No prompt provided" }), 400
 
         neo4j_data = process_prompt(prompt)
-        print(f"neo4j_data: {neo4j_data}")
-        
+        # print(f"neo4j_data: {neo4j_data}")
         
         qdrant_data = query_qdrant(prompt)
-        print(f"qdrant_data: {qdrant_data}")
+        # print(f"qdrant_data: {qdrant_data}")
 
-        print("Applying template...")
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data)
-        print(f"final_prompt: {final_prompt}")
+        # print(f"final_prompt: {final_prompt}")
 
-        final_response = query_llama()
+        final_response = query_llama(final_prompt)
+        print("RETURNING LLAMA RESPONSE:", final_response)
+
         # print(f"final_response: {final_response}")
 
         return flask.jsonify({ "llm_response": final_response })
@@ -85,7 +77,13 @@ def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     # template = f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
     return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\n\n' 
 
-def query_llama(model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
+def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
+    # add the prompt to the thread
+    thread.append({
+        'role': 'user',
+        'message': prompt
+    })
+
     response = requests.post('https://api.llms.afterhoursdev.com/chat/completions',
                            headers={
                                'Content-Type': 'application/json',
@@ -99,18 +97,18 @@ def query_llama(model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxG
                                'max_tokens': maxGenLen,
                            })
     
+    
     if response.status_code != 200:
         raise Exception(f"LLAMA API request failed with status code {response.status_code}: {response.text}")
     
     response_json = response.json()
-    llama_output = response_json['data']['generation'].strip()
+    llama_output = response_json['generation'].strip()
 
     thread.append({
         'role': 'assistant',
         'message': llama_output
     })
 
-    print("LLAMA API response:", llama_output)
 
     return llama_output
 
@@ -120,4 +118,4 @@ def query_llama(model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxG
 
 
 if __name__ == '__main__':
-    app.run(host=FLASK_HOST, port=FLASK_PORT)
+    app.run(host=FLASK_HOST, port=FLASK_PORT, debug=True)

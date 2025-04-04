@@ -130,8 +130,6 @@ def process_prompt(prompt: str) -> str:
     max_tries = 3
     tries = 0
     while tries < max_tries:
-        print("\nGenerated Cypher Query:\n", cypher_query)
-
         if not cypher_query.startswith("match"):
             print("⚠️ Cypher query does not start with 'match' — trying again.")
             full_prompt = apply_error_template(prompt, cypher_query)
@@ -147,14 +145,14 @@ def process_prompt(prompt: str) -> str:
             tries += 1
         else:
             break
-
-    print("\nResults:")
-    # the results from neo4j is a list of dicts, where each dict is a row of data
+    
+    print(f"\nFinal Cypher Query used: {cypher_query}")
+    print("\nCypher query results:") # the results from neo4j is a list of dicts, where each dict is a row of data
     if results:
         for row in results:
             print(row)
     else:
-        print("No results or error occurred.")
+        print("No Neo4j results, or error occurred.")
         results = ""
 
     return results
