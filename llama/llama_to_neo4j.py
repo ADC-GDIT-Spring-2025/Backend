@@ -44,7 +44,9 @@ Relationships:
 def apply_template(user_question: str) -> str:
     return f"""{TEMPLATE_INTRO}
 
-Translate the user's question into a Cypher query using the schema above.
+Translate the user's question into a Cypher query using the schema above. 
+If the question does not need specific information from the dataset to be answered, then respond ONLY with "return ''" to return no data.
+
 If you need to perform multiple match statements, combine them into one query.
 Do NOT include explanations or formatting — only return the Cypher query. 
 Your resposne should start with "match" and be a valid Cypher query.
@@ -123,13 +125,18 @@ def run_cypher_query(query: str) -> str:
 
 # ========== Main Program ==========
 
-def process_prompt(prompt: str) -> str:
+def query_neo4j(prompt: str) -> str:
     full_prompt = apply_template(prompt)
     cypher_query = query_llama(full_prompt)
 
     max_tries = 3
     tries = 0
     while tries < max_tries:
+        print(f"\nAttempt {tries + 1}: {cypher_query}")
+
+        if cypher_query.startswith("return"):
+            return ''  # return no data
+
         if not cypher_query.startswith("match"):
             print("⚠️ Cypher query does not start with 'match' — trying again.")
             full_prompt = apply_error_template(prompt, cypher_query)
@@ -145,7 +152,7 @@ def process_prompt(prompt: str) -> str:
             tries += 1
         else:
             break
-        
+
 
     if results is None or str(results).startswith("Neo4j query error"):
         print("⚠️ Failed to get valid results from Neo4j after multiple attempts.")
@@ -154,7 +161,7 @@ def process_prompt(prompt: str) -> str:
     print(f"\nFinal Cypher Query used: {cypher_query}")
     print("\nCypher query results:") # the results from neo4j is a list of dicts, where each dict is a row of data
     if results:
-        for row in results:
+        for row in results[:10]:
             print(row)
     else:
         print("No Neo4j results, or error occurred.")
@@ -165,4 +172,4 @@ def process_prompt(prompt: str) -> str:
 
 if __name__ == "__main__":
     prompt = input("Enter your question: ")
-    process_prompt(prompt)
+    query_neo4j(prompt)

@@ -1,4 +1,4 @@
-from Llama.llama_to_neo4j import process_prompt
+from Llama.llama_to_neo4j import query_neo4j
 import flask
 import json
 import os
@@ -16,7 +16,7 @@ SYSTEM_PROMPT="""
     If relevant data is available, incorporate it naturally into your response without explicitly stating its source.  
 
     Your response should:  
-    1. **Present information clearly and conversationally**, avoiding any mention of databases, queries, file formats, email or person or thread ids, or filepaths.  
+    1. **Present information clearly and conversationally**, avoiding any mention of databases, queries, file formats, email ids, person ids, thread ids, or filepaths.  
     2. **Seamlessly integrate retrieved data** with your general knowledge to provide insightful and well-structured answers.  
     3. **Indicate when a response is based purely on AI knowledge**, particularly if no supporting data is available.  
     4. **Use markdown for formatting** when presenting structured information (e.g., lists, summaries).  
@@ -33,8 +33,17 @@ thread = []
 def index():
     return 'Server is running on port 5002.'
 
+@app.route('/clear', methods=['GET'])
+def clear():
+    global thread
+    thread = []
+    print("Thread cleared")
+    return flask.jsonify({ "message": "Backend thread cleared" }), 200
+    
+
 @app.route('/', methods=['POST'])
 def route():
+    global thread
     try:
         prompt = flask.request.json.get('prompt', '').strip()
         print(f'RECIEVED PROMPT: {prompt}')
@@ -42,7 +51,7 @@ def route():
         if not prompt:
             return flask.jsonify({ "error": "No prompt provided" }), 400
 
-        neo4j_data = process_prompt(prompt)
+        neo4j_data = query_neo4j(prompt)
         # print(f"neo4j_data: {neo4j_data}")
         
         qdrant_data = query_qdrant(prompt)
@@ -66,11 +75,6 @@ def route():
 def query_qdrant(prompt: str) -> str:
     # perform similarity search
     return ""
-
-def query_neo4j(prompt: str) -> str:
-    results = process_prompt(prompt)
-
-    return results
 
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
@@ -99,10 +103,14 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
     
     
     if response.status_code != 200:
+        # remove the prompt from the thread
+        thread.pop()
         raise Exception(f"LLAMA API request failed with status code {response.status_code}: {response.text}")
     
     response_json = response.json()
     llama_output = response_json['generation'].strip()
+
+    
 
     thread.append({
         'role': 'assistant',
@@ -111,9 +119,6 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
 
 
     return llama_output
-
-
-
 
 
 
