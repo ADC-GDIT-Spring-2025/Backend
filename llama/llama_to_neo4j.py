@@ -145,6 +145,11 @@ def process_prompt(prompt: str) -> str:
             tries += 1
         else:
             break
+        
+
+    if results is None or str(results).startswith("Neo4j query error"):
+        print("⚠️ Failed to get valid results from Neo4j after multiple attempts.")
+        return ""
     
     print(f"\nFinal Cypher Query used: {cypher_query}")
     print("\nCypher query results:") # the results from neo4j is a list of dicts, where each dict is a row of data
