@@ -1,4 +1,4 @@
-from Llama.llama_to_neo4j import query_neo4j
+from llama.llama_to_neo4j import query_neo4j
 import flask
 import json
 import os
@@ -20,6 +20,7 @@ SYSTEM_PROMPT="""
     2. **Seamlessly integrate retrieved data** with your general knowledge to provide insightful and well-structured answers.  
     3. **Indicate when a response is based purely on AI knowledge**, particularly if no supporting data is available.  
     4. **Use markdown for formatting** when presenting structured information (e.g., lists, summaries).  
+    5. ***DO NOT HALLUCINATE OR MAKE UP DATA.*** If you have no relevant data on the topic, just state this to the user.
     
     Always aim to be **concise, accurate, and engaging**, ensuring clarity in your explanations."""
 
