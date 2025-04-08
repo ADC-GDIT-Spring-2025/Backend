@@ -77,8 +77,8 @@ def search(vector_id):
             limit=5,
             with_vectors = True
         )
-
-        formatted_hits = [{"id": hit.id, "score": hit.score} for hit in hits]
+        #formatted_hits = hits
+        formatted_hits = [{"id": hit.id, "score": hit.score, "payload": hit.payload} for hit in hits]
 
         return jsonify({"results": f"{formatted_hits}"})
 
