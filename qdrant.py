@@ -7,6 +7,7 @@ from qdrant_client.models import (
     HnswConfig
 )
 import numpy as np
+import json
 
 app = Flask(__name__)
 
@@ -25,31 +26,47 @@ qdrant.create_collection(
 
 @app.route("/insert_embeddings", methods=["POST"])
 def insert_embeddings():
-    """Insert precomputed embeddings into Qdrant"""
+    """
+    Loading vectors and metadata, the insert them into Qdrant.
+    Utilizing: 
+    - embeddings.npy shape (n,768)
+    - metadata.json: list of n dicts with relevant fields ('text, 'sender', etc.)
+    - embeddings.npy : shape (n, 768)
+    """
     try:
         embeddings = np.load("embeddings.npy")
+        with open("metadata.json", "r") as f:
+            payloads = json.load(f)
         num_vectors, dim = embeddings.shape
+        if len(payloads) != num_vectors:
+            return jsonify({"error": "Mismatch between embeddings and metadata lengths"}), 400
 
         points = [
-            PointStruct(id=i, vector=embeddings[i].tolist())
+            PointStruct(
+                id=i,
+                vector=embeddings[i].tolist(),
+                payload=payloads[i]
+            )
             for i in range(num_vectors)
         ]
 
         qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
-        return jsonify({"message": f"Inserted {num_vectors} embeddings into Qdrant"})
+        return jsonify({"message": f"Inserted {num_vectors} vectors with payloads into Qdrant."})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/search/<int:vector_id>", methods=["GET"])
-def search(vector_id):
-    """Search for the closest vectors using HNSW"""
-
+def search_by_id(vector_id):
+    """
+    Retrieve a vector by ID and run similarity search with it.
+    Returns top-5 hits and their payloads.
+    """
     try:
-        # Fetch the vector corresponding to the given vector_id using 'retrieve'
         result = qdrant.retrieve(
             collection_name=COLLECTION_NAME,
-            ids=[vector_id]
+            ids=[vector_id],
+            with_vectors=True
         )
 
         # Check if the result is empty or doesn't contain the expected data
@@ -61,7 +78,7 @@ def search(vector_id):
 
         # Access the vector from the result (adjust based on the actual structure of the Record)
         query_vector = result[0].vector  # Assuming the vector is inside the 'vector' attribute
-        
+
         # Check if the vector is None or not in the correct format
         if query_vector is None or not isinstance(query_vector, list):
             return jsonify({"error": f"Vector with id {vector_id} is not in a valid format."}), 400
@@ -72,87 +89,86 @@ def search(vector_id):
         # Perform the search using the query_vector
         hits = qdrant.search(
             collection_name=COLLECTION_NAME,
-            query_vector=query_vector,  # Use the fetched vector here
-            limit=5
+            query_vector=query_vector, # Use the fetched vector here
+            limit=5,
+            with_payload=True
         )
 
-        return jsonify({"message": f"Found these vectors: {hits}"})
+        results = [
+            {"id": hit.id, "score": hit.score, "payload": hit.payload}
+            for hit in hits
+        ]
+        return jsonify({"results": results})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-
-
-
-
+@app.route("/search_vector", methods=["POST"])
+def search_by_vector():
     """
-    data = request.json
-    query_vector = data.get("vector")
-
-    if query_vector is None:
-        return jsonify({"error": "Missing query vector"}), 400
-
-    search_results = qdrant.search(
-        collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
-        limit=5,
-        with_payload=True,
-        params={"hnsw_ef": 50}
-    )
-
-    return jsonify({"results": [hit.id for hit in search_results]})
+    Accepts a vector in the request body, performs similarity search, and returns payloads.
     """
+    try:
+        query_vector = request.json.get("vector")
+        if not query_vector or not isinstance(query_vector, list):
+            return jsonify({"error": "Missing or invalid vector"}), 400
+
+        hits = qdrant.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_vector,
+            limit=5,
+            with_payload=True
+        )
+
+        results = [
+            {"id": hit.id, "score": hit.score, "payload": hit.payload}
+            for hit in hits
+        ]
+        return jsonify({"results": results})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/get_vector/<int:vector_id>", methods=["GET"])
 def get_vector(vector_id):
-    """Retrieve a vector by its ID"""
+    """Fetch a single vector and its payload."""
     try:
-        result = qdrant.retrieve(collection_name=COLLECTION_NAME, ids=[vector_id])
-        print(f"Retrieved result for ID {vector_id}: {result}")
+        result = qdrant.retrieve(
+            collection_name=COLLECTION_NAME,
+            ids=[vector_id],
+            with_vectors=True,
+            with_payload=True
+        )
         if not result:
             return jsonify({"error": "Vector not found"}), 404
-        return jsonify({"vector": result[0].vector})
+
+        return jsonify({
+            "id": result[0].id,
+            "vector": result[0].vector,
+            "payload": result[0].payload
+        })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/get_all_vectors", methods=["GET"])
-def get_all_vectors():
-    """Retrieve all stored vectors"""
-    try:
-        vectors = qdrant.scroll(collection_name=COLLECTION_NAME, limit=100)
-        return jsonify({"vectors": [{"id": v.id, "vector": v.vector} for v in vectors]})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    try:
-        result = client.retrieve(collection_name="your_collection", ids=[])
-        if result:
-            # Iterate over the list of results and access each id and vector
-            vectors = [{'id': point.id, 'vector': point.vector} for point in result]
-            return jsonify({"vectors": vectors})
-        else:
-            return jsonify({"error": "No vectors found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route("/list_vectors", methods=["GET"])
-def list_ids():
-    """Get all vector IDs in the Qdrant collection."""
+def list_vectors():
+    """Scroll and list payloads of the first 100 vectors (no vectors returned)."""
     try:
-        # Perform the search or scroll with a limit
-        search_results = qdrant.scroll(
+        scroll_result = qdrant.scroll(
             collection_name=COLLECTION_NAME,
-            limit=100,  # Increase the limit if needed
-            with_vectors=True
+            limit=100,
+            with_payload=True,
+            with_vectors=False
         )
-        
-        # Log the output to see the structure of search_results
-        print(search_results)
-        
-        # Assuming search_results contains 'matches' or similar field
-        vectors = [record.vector for record in search_results[0]]  # Adjust based on the structure
-        
+
+        vectors = [
+            {"id": point.id, "payload": point.payload}
+            for point in scroll_result[0]
+        ]
         return jsonify({"vectors": vectors})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
