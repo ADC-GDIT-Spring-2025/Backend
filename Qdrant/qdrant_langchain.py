@@ -43,13 +43,17 @@ retriever = qdrant.as_retriever(
     search_kwargs={"k": 10, "lambda_mult": 0.2}
 )
 
-document_chain = create_stuff_documents_chain(
-    llm=None,  # set dynamically per request
-    prompt=prompt,
-    document_prompt=document_prompt
-)
+detailed_prompt = PromptTemplate.from_template(
+    """You are a Qdrant vector database query expert. 
+The vector schema includes a passage (1 sentence with 1 before and after for context) 
+and metadata fields: date, location, person, action, finance, legal, event, product, organization.
+Rewrite the user’s question to optimize it for semantic vector search using this structure. 
+Emphasize key concepts and align with relevant metadata when possible. 
+Only return the improved query WITHOUT any explanation.
 
-retrieval_chain = create_retrieval_chain(retriever, document_chain)
+User question: "{query}"
+Qdrant query:"""
+)
 
 @app.route("/query", methods=["POST"])
 def query():
@@ -64,13 +68,14 @@ def query():
     _, llm = init_groq(model_name="llama-3.3-70b-versatile")
     llm.groq_api_key = random.choice(api_keys)
 
-    # Bind LLM into the chain
+    optimized_query = llm.invoke(rewrite_prompt.format(query=query_text)).strip()
+
     chain = create_retrieval_chain(
         retriever,
         create_stuff_documents_chain(llm, prompt=prompt, document_prompt=document_prompt)
     )
 
-    result = chain.invoke({"input": query_text})
+    result = chain.invoke({"input": optimized_query})
     return jsonify({"answer": result.get("answer", "No answer generated.")})
 
 
