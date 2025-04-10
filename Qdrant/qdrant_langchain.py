@@ -10,10 +10,10 @@ import joblib
 import random
 
 app = Flask(__name__)
-COLLECTION_NAME = "enron_emails"
+COLLECTION_NAME = "my_documents"
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-QDRANT_PATH = "qdrant_db"
+QDRANT_PATH = "C:\DEV\Datasets\EnronEmailDataset\qdrant_db"
 
 embedding_model = HuggingFaceEmbeddings(
     model_name="intfloat/e5-base-v2",
@@ -21,15 +21,15 @@ embedding_model = HuggingFaceEmbeddings(
     encode_kwargs={"normalize_embeddings": True}
 )
 
-docslist = joblib.load("docslist.pkl")
+docslist = joblib.load("C:\DEV\Datasets\EnronEmailDataset\data\docslist.pkl")
 
-qdrant = Qdrant.from_documents(
-    docslist,
-    embedding_model,
-    path=QDRANT_PATH,
-    collection_name=COLLECTION_NAME,
-)
-
+# qdrant = Qdrant.from_documents(
+#     docslist,
+#     embedding_model,
+#     path=QDRANT_PATH,
+#     collection_name=COLLECTION_NAME,
+# )
+qdrant = Qdrant.from_existing_collection(embedding_model, path=QDRANT_PATH, collection_name=COLLECTION_NAME)
 prompt = ChatPromptTemplate.from_template(
     "Answer question based only on the context below.\n\n{context}\n\nQuestion: {input}"
 )
@@ -68,7 +68,7 @@ def query():
     _, llm = init_groq(model_name="llama-3.3-70b-versatile")
     llm.groq_api_key = random.choice(api_keys)
 
-    optimized_query = llm.invoke(rewrite_prompt.format(query=query_text)).strip()
+    optimized_query = llm.invoke(detailed_prompt.format(query=query_text)).content.strip()
 
     chain = create_retrieval_chain(
         retriever,
@@ -80,4 +80,4 @@ def query():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
