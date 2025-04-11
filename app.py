@@ -1,4 +1,5 @@
-from llama.llama_to_neo4j import query_neo4j
+from Llama.llama_to_neo4j import query_neo4j
+from Qdrant.qdrant_langchain import query_qdrant
 import flask
 import json
 import os
@@ -72,15 +73,8 @@ def route():
         print("Error:", str(e))
         return flask.jsonify({ "error": str(e) }), 500
 
-
-def query_qdrant(prompt: str) -> str:
-    # perform similarity search
-    return ""
-
-
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
-    # template = f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
-    return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\n\n' 
+    return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
 
 def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
     # add the prompt to the thread
