@@ -1,36 +1,3 @@
-Skip to content
-Navigation Menu
-ADC-GDIT-Spring-2025
-Machine-Learning
-
-Type / to search
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security
-Insights
-Added python script that cleans + normalizes enron dataset and implements NLP preprocessing #1
- Closed
-ayanban928 wants to merge 1 commit into ADC-GDIT-Spring-2025:data_preprocessing from ayanban928:data_preprocessing 
-+172 −0 
- Conversation 0
- Commits 1
- Checks 0
- Files changed 1
- Closed
-Added python script that cleans + normalizes enron dataset and implements NLP preprocessing
-#1
-File filter 
- 
-0 / 1 files viewed
- 172 changes: 172 additions & 0 deletions172  
-clean_emails.py
-Viewed
-Original file line number	Diff line number	Diff line change
-@@ -0,0 +1,172 @@
 import pandas as pd
 import re
 import spacy
