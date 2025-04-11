@@ -13,7 +13,7 @@ app = Flask(__name__)
 COLLECTION_NAME = "my_documents"
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-QDRANT_PATH = "C:\DEV\Datasets\EnronEmailDataset\qdrant_db"
+QDRANT_PATH = "qdrant_db"
 
 embedding_model = HuggingFaceEmbeddings(
     model_name="intfloat/e5-base-v2",
@@ -21,7 +21,7 @@ embedding_model = HuggingFaceEmbeddings(
     encode_kwargs={"normalize_embeddings": True}
 )
 
-docslist = joblib.load("C:\DEV\Datasets\EnronEmailDataset\data\docslist.pkl")
+docslist = joblib.load("data_for_qdrant/docslist.pkl")
 
 # qdrant = Qdrant.from_documents(
 #     docslist,
