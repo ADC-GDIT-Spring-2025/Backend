@@ -56,7 +56,7 @@ def route():
         neo4j_data = query_neo4j(prompt)
         # print(f"neo4j_data: {neo4j_data}")
         
-        qdrant_data = query_qdrant(prompt)
+        qdrant_data = get_qdrant_data(prompt)
         # print(f"qdrant_data: {qdrant_data}")
 
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data)
@@ -72,6 +72,14 @@ def route():
     except Exception as e:
         print("Error:", str(e))
         return flask.jsonify({ "error": str(e) }), 500
+    
+def get_qdrant_data(prompt: str) -> str:
+    try:
+        response = requests.post("http://localhost:5003/qdrant", json={"prompt": prompt})
+        return response.json().get("answer", "No answer returned")
+    except Exception as e:
+        print("Error fetching Qdrant data:", str(e))
+        return "Error retrieving Qdrant data"
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
