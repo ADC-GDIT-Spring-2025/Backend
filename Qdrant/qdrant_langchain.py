@@ -68,4 +68,6 @@ def query_qdrant(query_text: str) -> str:
     )
 
     result = chain.invoke({"input": optimized_query})
+    print("Qdrant results:")
+    print(result.get("answer", "No answer generated."))
     return result.get("answer", "No answer generated.")
