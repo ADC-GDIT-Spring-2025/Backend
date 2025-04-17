@@ -37,6 +37,8 @@ Relationships:
 (:Person)<-[:RECEIVED_BCC]-(:Email)
 (:Email)-[:REPLY]->(:Email)
 (:Email)-[:FORWARD]->(:Email)
+
+Limit the response from neo4j to 10 nodes for cases where the query returns the email body itself so as to not overload the reponse.
 """
 
 # ========== Prompt Template ==========

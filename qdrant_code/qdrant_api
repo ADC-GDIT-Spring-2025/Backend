@@ -11,12 +11,16 @@ def handle_qdrant_query():
     prompt = data.get("prompt", "").strip()
 
     if not prompt:
+        print("Missing Prompt")
         return jsonify({"error": "Missing prompt"}), 400
 
     try:
         answer = query_qdrant(prompt)
+        print("RESULTS FROM QDRANT:")
+        print(answer)
         return jsonify({"answer": answer})
     except Exception as e:
+        print(f"error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":

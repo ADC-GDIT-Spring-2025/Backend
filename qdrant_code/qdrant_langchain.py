@@ -54,9 +54,9 @@ def query_qdrant(query_text: str) -> str:
         search_type="mmr",
         search_kwargs={"k": 10, "lambda_mult": 0.2}
     )
-
+    
     # Dynamically import LLM and API key here
-    from Qdrant.initialize_groq import init_groq, api_keys
+    from initialize_groq import init_groq, api_keys
     _, llm = init_groq(model_name="llama-3.3-70b-versatile")
     llm.groq_api_key = random.choice(api_keys)
 
