@@ -86,7 +86,6 @@ Your response should start with "MATCH" and be a VALID Cypher query.
 Only provide ONE Cypher query, do NOT provide multiple queries or options.
 {filter_instructions}
 
-{filter_instructions}
 User question: "{user_question}"
 
 Cypher query:
@@ -105,7 +104,6 @@ Question: "{user_question}"
 Failed query: {cypher_query}
 {error_msg}
 
-{filter_instructions}
 Generate a new, corrected Cypher query that:
 1. Must start with 'match'
 2. Must be syntactically valid
