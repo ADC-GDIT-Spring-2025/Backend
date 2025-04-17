@@ -39,36 +39,35 @@ Relationships:
 (:Email)-[:FORWARD]->(:Email)
 """
 
+message_thread = []
+
 # ========== Prompt Template ==========
 def get_filter_template(filters: dict = None) -> str:
     """Generate filter instructions for the prompt template."""
     if not filters:
         return ""
         
-    filter_instructions = """
-Additional filter requirements:
-"""
-    if filters.get('from'):
-        filter_instructions += f"- The email must be sent by a person with email containing '{filters['from']}'\n"
-    if filters.get('to'):
-        filter_instructions += f"- The email must be received by a person with email containing '{filters['to']}'\n"
-    if filters.get('cc'):
-        filter_instructions += f"- The email must be CC'd to a person with email containing '{filters['cc']}'\n"
-    if filters.get('bcc'):
-        filter_instructions += f"- The email must be BCC'd to a person with email containing '{filters['bcc']}'\n"
-    if filters.get('dateFrom'):
-        filter_instructions += f"- The email date must be on or after {filters['dateFrom']}\n"
-    if filters.get('dateTo'):
-        filter_instructions += f"- The email date must be on or before {filters['dateTo']}\n"
-    if filters.get('keywords'):
-        filter_instructions += f"- The email subject or body must contain the keywords: '{filters['keywords']}'\n"
-    if filters.get('hasAttachment') == 'yes':
-        filter_instructions += "- The email must have attachments\n"
-    elif filters.get('hasAttachment') == 'no':
-        filter_instructions += "- The email must not have attachments\n"
-        
+    filter_instructions = "YOU MUST INCORPORATE THE FOLLOWING FILTERS IN YOUR QUERY:\n"
 
-    print(f"Filter instructions: {filter_instructions}")
+    if filters.get('from'):
+        filter_instructions += f"THE EMAIL MUST BE SENT BY A PERSON WITH EMAIL CONTAINING '{filters['from']}'\n"
+    if filters.get('to'):
+        filter_instructions += f"THE EMAIL MUST BE RECEIVED BY A PERSON WITH EMAIL CONTAINING '{filters['to']}'\n"
+    if filters.get('cc'):
+        filter_instructions += f"THE EMAIL MUST BE CC'D TO A PERSON WITH EMAIL CONTAINING '{filters['cc']}'\n"
+    if filters.get('bcc'):
+        filter_instructions += f"THE EMAIL MUST BE BCC'D TO A PERSON WITH EMAIL CONTAINING '{filters['bcc']}'\n"
+    if filters.get('dateFrom'):
+        filter_instructions += f"THE EMAIL DATE MUST BE ON OR AFTER {filters['dateFrom']}\n"
+    if filters.get('dateTo'):
+        filter_instructions += f"THE EMAIL DATE MUST BE ON OR BEFORE {filters['dateTo']}\n"
+    if filters.get('keywords'):
+        filter_instructions += f"THE EMAIL SUBJECT OR BODY MUST CONTAIN THE KEYWORDS: '{filters['keywords']}'\n"
+    if filters.get('hasAttachment') == 'yes':
+        filter_instructions += "THE EMAIL MUST HAVE ATTACHMENTS\n"
+    elif filters.get('hasAttachment') == 'no':
+        filter_instructions += "THE EMAIL MUST NOT HAVE ATTACHMENTS\n"
+        
     return filter_instructions
 
 def apply_template(user_question: str, filters: dict = None) -> str:
@@ -76,15 +75,15 @@ def apply_template(user_question: str, filters: dict = None) -> str:
 
     return f"""{TEMPLATE_INTRO}
 
-Translate the user's question into a Cypher query using the schema above. 
+Using the context of previous user messages, TRANSLATE the user's question into a CYPHER QUERY using the schema above. 
 If the question does not need specific information from the dataset to be answered, then respond ONLY with "return ''" to return no data.
 
-If you need to perform multiple match statements, combine them into one query.
-Do NOT include explanations or formatting — only return the Cypher query. 
-Your response should start with "match" and be a valid Cypher query.
-Only provide ONE Cypher query, do not provide multiple queries or options.
-
+If you need to perform multiple match statements, COMBINE them into one query.
+Do NOT include explanations or formatting — return ONLY the Cypher query. 
+Your response should start with "MATCH" and be a VALID Cypher query.
+Only provide ONE Cypher query, do NOT provide multiple queries or options.
 {filter_instructions}
+
 User question: "{user_question}"
 
 Cypher query:
@@ -103,13 +102,13 @@ Question: "{user_question}"
 Failed query: {cypher_query}
 {error_msg}
 
-{filter_instructions}
 Generate a new, corrected Cypher query that:
 1. Must start with 'match'
 2. Must be syntactically valid
 3. Must use the schema exactly as shown above
 4. Must answer the original question
-5. Must include all the filter requirements specified above
+5. Must include ALL the filter requirements listed below:
+{filter_instructions}
 
 Return ONLY the corrected Cypher query with no explanations or additional text.
 
@@ -160,10 +159,14 @@ def run_cypher_query(query: str) -> str:
             driver.close()
 
 # ========== Main Program ==========
-
 def query_neo4j(prompt: str, filters: dict = None) -> str:
+    message_thread.append({
+        'role': 'user',
+        'message': prompt
+    })
     full_prompt = apply_template(prompt, filters)
     cypher_query = query_llama(full_prompt)
+    results = None
 
     max_tries = 3
     tries = 0
@@ -173,7 +176,7 @@ def query_neo4j(prompt: str, filters: dict = None) -> str:
         if cypher_query.startswith("return"):
             return ''  # return no data
 
-        if not cypher_query.startswith("match"):
+        if not cypher_query.lower().startswith("match"):
             print("⚠️ Cypher query does not start with 'match' — trying again.")
             full_prompt = apply_error_template(prompt, cypher_query, filters=filters)
             cypher_query = query_llama(full_prompt)
@@ -191,9 +194,11 @@ def query_neo4j(prompt: str, filters: dict = None) -> str:
 
     if results is None or str(results).startswith("Neo4j query error"):
         print("⚠️ Failed to get valid results from Neo4j after multiple attempts.")
+        print("Final attempt Cypher query: ", cypher_query)
         return ""
     
-    # print(f"\nFinal Cypher Query used: {cypher_query}")
+    print("\n Final prompt used to generate Cypher Query:\n", full_prompt)
+    print(f"\nFinal Cypher Query used: {cypher_query}")
     print("\nCypher query results:") # the results from neo4j is a list of dicts, where each dict is a row of data
     if results:
         for row in results[:10]:
