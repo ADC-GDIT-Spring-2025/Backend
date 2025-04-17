@@ -4,6 +4,9 @@ import json
 import os
 from flask_cors import CORS
 import requests
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 FLASK_HOST='127.0.0.1'
 FLASK_PORT=8080
