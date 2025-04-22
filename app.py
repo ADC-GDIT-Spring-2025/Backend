@@ -5,6 +5,9 @@ import json
 import os
 from flask_cors import CORS
 import requests
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 FLASK_HOST='127.0.0.1'
 FLASK_PORT=8080
@@ -47,23 +50,26 @@ def clear():
 def route():
     global thread
     try:
-        prompt = flask.request.json.get('prompt', '').strip()
+        data = flask.request.json
+        prompt = data.get('prompt', '').strip()
+        filters = data.get('filters', {})
         print(f'RECIEVED PROMPT: {prompt}')
+        print(f'RECIEVED FILTERS: {filters}')
 
         if not prompt:
             return flask.jsonify({ "error": "No prompt provided" }), 400
 
-        neo4j_data = query_neo4j(prompt)
+        neo4j_data = query_neo4j(prompt, filters) if filters.get('useNeo4j', True) else ""
         # print(f"neo4j_data: {neo4j_data}")
         
-        qdrant_data = get_qdrant_data(prompt)
+        qdrant_data = get_qdrant_data(prompt) if filters.get('useQdrant', False) else ""
         # print(f"qdrant_data: {qdrant_data}")
 
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data)
         # print(f"final_prompt: {final_prompt}")
 
         final_response = query_llama(final_prompt)
-        print("RETURNING LLAMA RESPONSE:", final_response)
+        # print("RETURNING LLAMA RESPONSE:", final_response)
 
         # print(f"final_response: {final_response}")
 
