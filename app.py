@@ -1,4 +1,4 @@
-from Llama.llama_to_neo4j import query_neo4j
+from llama_code.llama_to_neo4j import query_neo4j
 from qdrant_code.qdrant_langchain import query_qdrant
 import flask
 import json
