@@ -35,9 +35,6 @@ Qdrant query:"""
 
 def query_qdrant(query_text: str) -> str:
     # Load documents and initialize qdrant client only when called
-    docs_path = os.path.join(os.path.dirname(__file__), "data_for_qdrant", "docslist.pkl")
-    docslist = joblib.load(docs_path)
-
     embedding_model = HuggingFaceEmbeddings(
         model_name="intfloat/e5-base-v2",
         model_kwargs={"device": "cpu"},
@@ -50,24 +47,28 @@ def query_qdrant(query_text: str) -> str:
         collection_name=COLLECTION_NAME,
     )
 
-    retriever = qdrant.as_retriever(
-        search_type="mmr",
-        search_kwargs={"k": 10, "lambda_mult": 0.2}
-    )
-    
-    # Dynamically import LLM and API key here
-    from initialize_groq import init_groq, api_keys
-    _, llm = init_groq(model_name="llama-3.3-70b-versatile")
-    llm.groq_api_key = random.choice(api_keys)
+    try:
+        retriever = qdrant.as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": 10, "lambda_mult": 0.2}
+        )
+        
+        from initialize_groq import init_groq, api_keys
+        _, llm = init_groq(model_name="llama-3.3-70b-versatile")
+        llm.groq_api_key = random.choice(api_keys)
 
-    optimized_query = llm.invoke(detailed_prompt.format(query=query_text)).content.strip()
+        optimized_query = llm.invoke(detailed_prompt.format(query=query_text)).content.strip()
 
-    chain = create_retrieval_chain(
-        retriever,
-        create_stuff_documents_chain(llm, prompt=prompt, document_prompt=document_prompt)
-    )
+        chain = create_retrieval_chain(
+            retriever,
+            create_stuff_documents_chain(llm, prompt=prompt, document_prompt=document_prompt)
+        )
 
-    result = chain.invoke({"input": optimized_query})
-    print("Qdrant results:")
-    print(result.get("answer", "No answer generated."))
-    return result.get("answer", "No answer generated.")
+        result = chain.invoke({"input": optimized_query})
+        print("Qdrant results:")
+        print(result.get("answer", "No answer generated."))
+        return result.get("answer", "No answer generated.")
+
+    finally:
+        # manually close the underlying Qdrant client
+        qdrant.client.close()
