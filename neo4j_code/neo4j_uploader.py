@@ -3,7 +3,7 @@ import json
 import requests
 from neo4j import GraphDatabase
 import time
-from tqdm import tqdm  # Added tqdm import
+from tqdm import tqdm
 
 # Neo4j connection details (adjust these as needed)
 URL = "bolt://localhost:7687"

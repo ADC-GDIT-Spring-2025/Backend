@@ -205,7 +205,6 @@ def query_neo4j(prompt: str, filters: dict = None) -> str:
     if results:
         for row in results[:10]:
             print(row)
-            pass
     else:
         print("No Neo4j results, or error occurred.")
         results = ""
