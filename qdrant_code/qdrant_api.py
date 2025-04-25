@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from qdrant_langchain import query_qdrant
+from qdrant_code.qdrant_langchain import query_qdrant
 
 app = Flask(__name__)
 CORS(app)
@@ -15,10 +15,10 @@ def handle_qdrant_query():
         return jsonify({"error": "Missing prompt"}), 400
 
     try:
-        answer = query_qdrant(prompt)
+        answer, filenames = query_qdrant(prompt)
         print("RESULTS FROM QDRANT:")
-        print(answer)
-        return jsonify({"answer": answer})
+        print(answer, filenames)
+        return jsonify({"answer": answer, "filenames": filenames})
     except Exception as e:
         print(f"error: {str(e)}")
         return jsonify({"error": str(e)}), 500
