@@ -10,3 +10,4 @@ qdrant_storage/
 *.pyz
 *.pywz
 user_data/
+storage_sqlite

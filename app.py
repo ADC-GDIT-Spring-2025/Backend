@@ -1,14 +1,11 @@
 from llama_code.llama_to_neo4j import query_neo4j
 from qdrant_code.qdrant_langchain import query_qdrant
 import flask
+from flask import jsonify
 import json
 import os
 from flask_cors import CORS
 import requests
-from dotenv import load_dotenv
-import re
-
-load_dotenv(override=True)
 
 FLASK_HOST='127.0.0.1'
 FLASK_PORT=8080
@@ -51,109 +48,44 @@ def clear():
 def route():
     global thread
     try:
-        data = flask.request.json
-        prompt = data.get('prompt', '').strip()
-        filters = data.get('filters', {})
+        prompt = flask.request.json.get('prompt', '').strip()
         print(f'RECIEVED PROMPT: {prompt}')
-        print(f'RECIEVED FILTERS: {filters}')
 
         if not prompt:
             return flask.jsonify({ "error": "No prompt provided" }), 400
 
-        neo4j_data = query_neo4j(prompt, filters) if filters.get('useNeo4j', True) else ""
+        neo4j_data = query_neo4j(prompt)
         # print(f"neo4j_data: {neo4j_data}")
         
-        qdrant_data, filenames = get_qdrant_data(prompt) if filters.get('useQdrant', False) else ""
+        qdrant_data = get_qdrant_data(prompt)
         # print(f"qdrant_data: {qdrant_data}")
 
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data)
         # print(f"final_prompt: {final_prompt}")
 
         final_response = query_llama(final_prompt)
-        # print("RETURNING LLAMA RESPONSE:", final_response)
+        print("RETURNING LLAMA RESPONSE:", final_response)
 
-        raw_emails = get_files(filenames)
         # print(f"final_response: {final_response}")
 
-        return flask.jsonify({ "llm_response": final_response, "raw_emails": raw_emails })
+        return flask.jsonify({ "llm_response": final_response })
 
     except Exception as e:
         print("Error:", str(e))
         return flask.jsonify({ "error": str(e) }), 500
     
-def get_files(filenames: list[str]):
-    """
-    code taken from parser.py
-    """
-    email_files = []
-    for filename in filenames:
-        filename = os.path.join(os.path.dirname(__file__), "data/maildir", filename)
-        with open(filename, encoding='utf-8', errors='replace') as TextFile:
-            text = TextFile.read().replace("\r", "")
-            # Skip characters outside of Unicode range
-            text = re.sub(r'[^\x00-\x7F]+', '', text)  # Remove non-ASCII characters
-            try:
-                #
-                # Precompiled regular expression patterns for email parsing
-                # These patterns are compiled once for performance optimization when processing many emails
-                #
-                time_pattern = re.compile(r"Date: (?P<data>[A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4} \d{2}:\d{2}:\d{2} -\d{4} \([A-Z]{3}\))")
-                subject_pattern = re.compile(r"Subject: (?P<data>.*)")
-                sender_pattern = re.compile(r"From: (?P<data>.*)")
-                recipient_pattern = re.compile(r"To: (?P<data>.*)")
-                cc_pattern = re.compile(r"cc: (?P<data>.*)")
-                bcc_pattern = re.compile(r"bcc: (?P<data>.*)")
-                msg_start_pattern = re.compile(r"\n\n", re.MULTILINE)  # Email body typically starts after two newlines
-                msg_end_pattern = re.compile(r"\n+.*\n\d+/\d+/\d+ \d+:\d+ [AP]M", re.MULTILINE)  # Pattern to detect end of message in replies
-
-
-                # Extract email metadata
-                time = time_pattern.search(text).group("data").replace("\n", "")
-                subject = subject_pattern.search(text).group("data").replace("\n", "")
-                sender = sender_pattern.search(text).group("data").replace("\n", "")
-                recipient = recipient_pattern.search(text).group("data").split(", ")
-                cc = cc_pattern.search(text).group("data").split(", ")
-                bcc = bcc_pattern.search(text).group("data").split(", ")
-                
-                # Extract email body
-                msg_start_iter = msg_start_pattern.search(text).end()
-                try:
-                    msg_end_iter = msg_end_pattern.search(text).start()
-                    message = text[msg_start_iter:msg_end_iter]
-                except AttributeError:  # not a reply
-                    message = text[msg_start_iter:]
-                
-                # Clean up the message text to avoid errors from special characters
-                message = re.sub("[\n\r]", " ", message)
-                message = re.sub("  +", " ", message)
-
-
-                parsed_email = {
-                    "time": time,
-                    "subject": subject,
-                    "from": sender,
-                    "to": recipient,
-                    "cc": cc,
-                    "bcc": bcc,
-                    "message": message
-                }
-                email_files.append(parsed_email)
-                
-            except AttributeError:
-                print(f"Failed to parse {filename}")
-                return None
-        
-    return email_files
-            
-
 def get_qdrant_data(prompt: str) -> str:
+    if not prompt:
+        print("Missing Prompt")
+        return jsonify({"error": "Missing prompt"}), 400
     try:
-        response = requests.post("http://localhost:5003/qdrant", json={"prompt": prompt})
-        data = response.json()
-        return data.get("answer", "No answer returned"), data.get("filenames", [])
+        answer = query_qdrant(prompt)
+        print("RESULTS FROM QDRANT:")
+        print(answer)
+        return jsonify({"answer": answer})
     except Exception as e:
-        print("Error fetching Qdrant data:", str(e))
-        return "Error retrieving Qdrant data"
+        print(f"error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
@@ -164,6 +96,8 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
         'role': 'user',
         'message': prompt
     })
+    
+    print("Using API KEY:", API_KEY[:6] + "..." if API_KEY else "None set")
 
     response = requests.post('https://api.llms.afterhoursdev.com/chat/completions',
                            headers={
@@ -187,8 +121,6 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
     response_json = response.json()
     llama_output = response_json['generation'].strip()
 
-    
-
     thread.append({
         'role': 'assistant',
         'message': llama_output
@@ -196,8 +128,6 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
 
 
     return llama_output
-
-
 
 if __name__ == '__main__':
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=True)
