@@ -82,8 +82,8 @@ def parse_email(pathname, orig=True, progress_bar=None):
                 # Extract email metadata
                 time = time_pattern.search(text).group("data").replace("\n", "")
                 subject = subject_pattern.search(text).group("data").replace("\n", "")
-                sender = sender_pattern.search(text).group("data").replace("\n", "")
-                recipient = recipient_pattern.search(text).group("data").split(", ")
+                from_ = sender_pattern.search(text).group("data").replace("\n", "")
+                to = recipient_pattern.search(text).group("data").split(", ")
                 cc = cc_pattern.search(text).group("data").split(", ")
                 bcc = bcc_pattern.search(text).group("data").split(", ")
                 
@@ -91,20 +91,20 @@ def parse_email(pathname, orig=True, progress_bar=None):
                 msg_start_iter = msg_start_pattern.search(text).end()
                 try:
                     msg_end_iter = msg_end_pattern.search(text).start()
-                    message = text[msg_start_iter:msg_end_iter]
+                    body = text[msg_start_iter:msg_end_iter]
                 except AttributeError:  # not a reply
-                    message = text[msg_start_iter:]
+                    body = text[msg_start_iter:]
                 
                 # Clean up the message text to avoid errors from special characters
-                message = re.sub("[\n\r]", " ", message)
-                message = re.sub("  +", " ", message)
+                body = re.sub("[\n\r]", " ", body)
+                body = re.sub("  +", " ", body)
             except AttributeError:
                 logging.error("Failed to parse %s" % pathname)
                 return None
                 
             # Get or create unique IDs for users and threads
-            sender_id = get_or_allocate_uid(sender)
-            recipient_id = [get_or_allocate_uid(u.replace("\n", "")) for u in recipient if u!=""]
+            from_id = get_or_allocate_uid(from_)
+            to_ids = [get_or_allocate_uid(u.replace("\n", "")) for u in to if u!=""]
             cc_ids = [get_or_allocate_uid(u.replace("\n", "")) for u in cc if u!=""]
             bcc_ids = [get_or_allocate_uid(u.replace("\n", "")) for u in bcc if u!=""]
             thread_id = get_or_allocate_tid(subject)
@@ -115,8 +115,8 @@ def parse_email(pathname, orig=True, progress_bar=None):
             
         # Track all users involved in this email thread
         users_involved = []
-        users_involved.append(sender_id)
-        users_involved.extend(recipient_id)
+        users_involved.append(from_id)
+        users_involved.extend(to_ids)
         users_involved.extend(cc_ids)
         users_involved.extend(bcc_ids)
         thread_users[thread_id] |= set(users_involved)
@@ -128,7 +128,7 @@ def parse_email(pathname, orig=True, progress_bar=None):
             user_threads[user].add(thread_id)
  
         # Create the email entry and add it to the feeds list
-        entry =  {"time": time, "thread": thread_id, "sender": sender_id, "recipient": recipient_id, "cc": cc_ids, "bcc": bcc_ids, "message": message}
+        entry =  {"time": time, "thread": thread_id, "from": from_id, "to": to_ids, "cc": cc_ids, "bcc": bcc_ids, "subject": subject, "body": body}
         feeds.append(entry)
 
         # Update progress bar after processing each file
@@ -159,28 +159,28 @@ def parse_email(pathname, orig=True, progress_bar=None):
             print("Unable to write to output files, aborting")
             exit(1)
 
-def get_or_allocate_uid(name):
+def get_or_allocate_uid(email):
     """
     Get or create a unique ID for a user email address.
     
     Args:
-        name (str): Email address of a user
+        email (str): Email address of a user
         
     Returns:
         int: Unique ID for this user
         
     This function ensures each unique email address gets a consistent ID.
     """
-    if name not in users:
-        users[name] = len(users)
-    return users[name]
+    if email not in users:
+        users[email] = len(users)
+    return users[email]
 
-def get_or_allocate_tid(name):
+def get_or_allocate_tid(subject):
     """
     Get or create a unique ID for an email thread based on subject.
     
     Args:
-        name (str): Email subject line
+        subject (str): Email subject line
         
     Returns:
         int: Unique ID for this thread
@@ -188,7 +188,7 @@ def get_or_allocate_tid(name):
     This function removes common prefixes like "RE:" or "Fwd:" to group
     related emails into the same thread.
     """
-    parsed_name = re.sub("(RE|Re|FWD|Fwd): ", "", name)
+    parsed_name = re.sub("(RE|Re|FWD|Fwd): ", "", subject)
     if parsed_name not in threads:
         threads[parsed_name] = len(threads)
     return threads[parsed_name]

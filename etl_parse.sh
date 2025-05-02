@@ -48,7 +48,7 @@ echo "This may take a while depending on the size of the dataset..."
 python util/parser.py data/maildir
 
 # Check if the parsing was successful
-if [ ! -f "user_data/messages2.json" ]; then
+if [ ! -f "user_data/messages.json" ]; then
     echo "Error: Failed to parse emails or generate JSON files."
     echo "Please check the logs above for errors."
     exit 1
