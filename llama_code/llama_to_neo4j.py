@@ -1,6 +1,11 @@
 import requests
 import os
 from neo4j import GraphDatabase
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # ========== Config ==========
 
@@ -46,6 +51,7 @@ message_thread = []
 # ========== Prompt Template ==========
 def get_filter_template(filters: dict = None) -> str:
     """Generate filter instructions for the prompt template."""
+    logger.info(f"Generating filter template for filters: {filters}")
     if not filters:
         return ""
         
@@ -73,6 +79,7 @@ def get_filter_template(filters: dict = None) -> str:
     return filter_instructions
 
 def apply_template(user_question: str, filters: dict = None) -> str:
+    logger.info(f"Applying template for user question: {user_question}")
     filter_instructions = get_filter_template(filters)
 
     return f"""{TEMPLATE_INTRO}
@@ -92,6 +99,7 @@ Cypher query:
 """
 
 def apply_error_template(user_question: str, cypher_query: str, error_msg: str = "", filters: dict = None) -> str:
+    logger.info(f"Applying error template for user question: {user_question}, failed query: {cypher_query}, error: {error_msg}")
     if error_msg != "":
         error_msg = "Error message: " + error_msg
 
@@ -121,6 +129,8 @@ Cypher query:
 # ========== Calling the Llama model ==========
 
 def query_llama(prompt: str) -> str:
+    logger.info(f"Querying Llama model: {MODEL_NAME}")
+    logger.info(f"Llama prompt: {prompt}")
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
@@ -138,34 +148,51 @@ def query_llama(prompt: str) -> str:
         "maxGenLen": MAX_GEN_LEN
     }
 
-    response = requests.post(API_URL, headers=headers, json=payload)
-    response.raise_for_status()
-
-    data = response.json()
-
-    return data.get("generation", "").strip()
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        logger.info(f"Llama API request successful (Status: {response.status_code})")
+        data = response.json()
+        generation = data.get("generation", "").strip()
+        logger.info(f"Llama generation received: {generation}")
+        return generation
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error calling Llama API: {e}")
+        return ""
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during Llama API call: {e}")
+        return ""
 
 # ========== Neo4j Query Runner ==========
 
 def run_cypher_query(query: str) -> str:
-    driver = GraphDatabase.driver(NEO4J_URL, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    with driver.session() as session:
-        try:
+    # logger.info("Running Cypher query against Neo4j")
+    # logger.info(f"Executing query: {query}")
+    driver = None
+    try:
+        driver = GraphDatabase.driver(NEO4J_URL, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            # logger.info("Neo4j session opened.")
             result = session.run(query)
             data = result.data()
+            summary = result.consume()
             return data
-        except Exception as e:
-            print("Neo4j query error:", e)
-            return "Neo4j query error: " + str(e)
-        finally:
+    except Exception as e:
+        logger.error(f"Neo4j query failed for query '{query}'. Error: {e}")
+        return f"Neo4j query error: {e}"
+    finally:
+        if driver:
             driver.close()
 
 # ========== Main Program ==========
 def query_neo4j(prompt: str, filters: dict = None) -> str:
+    # logger.info(f"Starting query_neo4j process for prompt: '{prompt}' with filters: {filters}")
     message_thread.append({
         'role': 'user',
         'message': prompt
     })
+    logger.info(f"Appended user message to thread. Current thread length: {len(message_thread)}")
+    
     full_prompt = apply_template(prompt, filters)
     cypher_query = query_llama(full_prompt)
     results = None
@@ -173,45 +200,53 @@ def query_neo4j(prompt: str, filters: dict = None) -> str:
     max_tries = 3
     tries = 0
     while tries < max_tries:
-        # print(f"\nAttempt {tries + 1}: {cypher_query}")
+        # logger.info(f"Neo4j query attempt {tries + 1}/{max_tries}")
+        # logger.info(f"Attempt {tries + 1} - Query before filter application: {cypher_query}")
 
         if cypher_query.startswith("return"):
+            logger.info("Query starts with 'return', likely an indication to skip Neo4j. Returning empty data.")
             return ''  # return no data
 
         if not cypher_query.lower().startswith("match"):
-            print("⚠️ Cypher query does not start with 'match' — trying again.")
-            full_prompt = apply_error_template(prompt, cypher_query, filters=filters)
+            # logger.warning(f"Attempt {tries + 1} - Cypher query does not start with 'match'. Query: '{cypher_query}'. Requesting correction from Llama.")
+            full_prompt = apply_error_template(prompt, cypher_query, error_msg="Query does not start with MATCH")
             cypher_query = query_llama(full_prompt)
             tries += 1
             continue
-        print("\nQuerying Neo4j...")
+        logger.info(f"Attempt {tries + 1} - Querying Neo4j...")
         results = run_cypher_query(cypher_query)
-        if results is None or str(results).startswith("Neo4j query error"):
-            print("⚠️ Neo4j query error or invalid query — trying again.")
-            full_prompt = apply_error_template(prompt, cypher_query, results, filters)
+        
+        if results is None or results == [] or str(results).startswith("Neo4j query error"):
+            logger.warning(f"Attempt {tries + 1} - Neo4j query returned error or empty result. Requesting correction from Llama.")
+            if results is None or results == []:
+                error_msg = "Query returned no results."
+            else:
+                error_msg = str(results)
+            full_prompt = apply_error_template(prompt, cypher_query, error_msg)
             cypher_query = query_llama(full_prompt)
             tries += 1
         else:
             break
 
     if results is None or str(results).startswith("Neo4j query error"):
-        print("⚠️ Failed to get valid results from Neo4j after multiple attempts.")
-        print("Final attempt Cypher query: ", cypher_query)
+        logger.error(f"Failed to get valid results from Neo4j after {max_tries} attempts.")
+        logger.error(f"Final failing Cypher query: {cypher_query}")
         return ""
     
-    print("\n Final prompt used to generate Cypher Query:\n", full_prompt)
-    print(f"\nFinal Cypher Query used: {cypher_query}")
-    print("\nCypher query results:") # the results from neo4j is a list of dicts, where each dict is a row of data
-    if results:
-        for row in results[:10]:
-            print(row)
-    else:
-        print("No Neo4j results, or error occurred.")
+    logger.info(f"Final successful Cypher Query: {cypher_query}")
+    
+    if not results:
+        logger.info("Process finished with no results.")
         results = ""
+    else:
+        logger.info(f"Process finished successfully with {len(results)} result items.")
 
     return results
 
 
 if __name__ == "__main__":
-    prompt = input("Enter your question: ")
-    query_neo4j(prompt)
+    if not API_KEY:
+        logger.error("LLAMA_API_KEY environment variable not set.")
+    else:
+        prompt = input("Enter your question: ")
+        query_neo4j(prompt)
