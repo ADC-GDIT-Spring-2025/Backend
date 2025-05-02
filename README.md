@@ -29,7 +29,6 @@ First make sure you have a local instance of Neo4j RUNNING:
 - Open a browser and go to `http://localhost:7474`
 - Enter the username and password (neo4j/cheerios4150)
 - Enter the command `MATCH (n) RETURN n` to get all nodes/relationships in the graph
-- Enter the command `MATCH (n) DETACH DELETE n` to get rid of all nodes/relationships in the graph
 
 #### To populate the graph with the Enron email dataset:
 
