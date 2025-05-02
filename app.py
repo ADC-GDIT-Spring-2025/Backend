@@ -58,13 +58,17 @@ def route():
         # print(f"neo4j_data: {neo4j_data}")
         
         qdrant_data = get_qdrant_data(prompt)
-        # print(f"qdrant_data: {qdrant_data}")
+        qdrant_data_string = qdrant_data.get_data(as_text=True)
+        print("QDRANT RESULT —————————————————————————————————————————————————————————")
+        print(qdrant_data_string)
 
-        final_prompt = apply_template(prompt, neo4j_data, qdrant_data)
-        # print(f"final_prompt: {final_prompt}")
+        final_prompt = apply_template(prompt, neo4j_data, qdrant_data_string)
+        print("FINAL PROMPT —————————————————————————————————————————————————————————")
+        print(final_prompt)
 
         final_response = query_llama(final_prompt)
-        print("RETURNING LLAMA RESPONSE:", final_response)
+        print("RETURNING LLAMA RESPONSE —————————————————————————————————————————————————————————")
+        print(final_response)
 
         # print(f"final_response: {final_response}")
 
@@ -80,15 +84,13 @@ def get_qdrant_data(prompt: str) -> str:
         return jsonify({"error": "Missing prompt"}), 400
     try:
         answer = query_qdrant(prompt)
-        print("RESULTS FROM QDRANT:")
-        print(answer)
         return jsonify({"answer": answer})
     except Exception as e:
         print(f"error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
-    return f'Prompt: {prompt}\nKnowledge Graph Data: {neo4j_data}\nQdrant Data: {qdrant_data}\n\n'
+    return f'Here is the original prompt from the user: {prompt}\nNext is some relevant information from Neo4j, this is blank if there was no relevant info in the knowledge graph database. This info can be a count of emails if the user prompt asks something along the lines of "how many emails did person X send to person Y?". Or it can be the body of emails that are relevant to the question, like if the user prompt was "Summarize the emails sent between person X and person Y". Use the returned info to answer the user prompt, and quote lines from the email bodies directly when possible, citing the email you used. Here are the results from querying Neo4j with the prompt: {neo4j_data}\nNext is the result of running the prompt through Qdrant. Qdrant should return examples of emails that are relevant or help answer the prompt. Use these emails as the source for your answer to the prompt, and directly quote them as examples. Here is the result of running the prompt through Qdrant: {qdrant_data}\nRemember to use both the info from Neo4j and Qdrant to answer your question, using direct quotes and citations from the data as much as possible. If there was any data returned by Neo4j and Qdrant use that and avoid using your own knowledge.\n'
 
 def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
     # add the prompt to the thread

@@ -80,9 +80,6 @@ def query_qdrant(query_text: str) -> str:
 
         # Step 5: Generate answer using LLM
         response = llm.invoke(final_prompt)
-
-        print("Qdrant results:")
-        print(response.content.strip())
         return response.content.strip()
 
     finally:
