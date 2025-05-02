@@ -7,6 +7,11 @@ import os
 import re
 from flask_cors import CORS
 import requests
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 FLASK_HOST='127.0.0.1'
 FLASK_PORT=8080
@@ -41,7 +46,7 @@ def index():
 def clear():
     global thread
     thread = []
-    print("Thread cleared")
+    logger.info("Thread cleared")
     return flask.jsonify({ "message": "Backend thread cleared" }), 200
     
 
@@ -50,50 +55,68 @@ def route():
     global thread
     try:
         prompt = flask.request.json.get('prompt', '').strip()
-        print(f'RECIEVED PROMPT: {prompt}')
+        logger.info(f'RECIEVED PROMPT: {prompt}')
 
         if not prompt:
+            logger.error("No prompt provided")
             return flask.jsonify({ "error": "No prompt provided" }), 400
-
-        neo4j_data = query_neo4j(prompt)
-        # print(f"neo4j_data: {neo4j_data}")
         
-        qdrant_data = get_qdrant_data(prompt)
-        qdrant_data_string = qdrant_data.get_data(as_text=True)
-        print("QDRANT RESULT —————————————————————————————————————————————————————————")
-        print(qdrant_data_string)
+        filters = flask.request.json.get('filters', None)
+        logger.info(f'RECIEVED FILTERS: {filters}')
+
+
+        neo4j_data = []
+        if filters['useNeo4j']:
+            neo4j_data = query_neo4j(prompt, filters)
+            logger.info(f"NEO4J RESULT —————————————————————————————————————————————————————————")
+            if neo4j_data:
+                logger.info(neo4j_data)
+            else:
+                logger.info("No Neo4j results, or error occurred.")
+                neo4j_data = []
+        
+        qdrant_data_string = ""
+        if filters['useQdrant']:
+            qdrant_data = get_qdrant_data(prompt)
+            qdrant_data_string = qdrant_data.get_data(as_text=True)
+            logger.info("QDRANT RESULT —————————————————————————————————————————————————————————")
+            logger.info(qdrant_data_string)
 
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data_string)
-        print("FINAL PROMPT —————————————————————————————————————————————————————————")
-        print(final_prompt)
+        # logger.info("FINAL PROMPT —————————————————————————————————————————————————————————")
+        # logger.info(final_prompt)
 
         final_response = query_llama(final_prompt)
-        print("RETURNING LLAMA RESPONSE —————————————————————————————————————————————————————————")
-        print(final_response)
+        logger.info("RETURNING LLAMA RESPONSE —————————————————————————————————————————————————————————")
+        logger.info(final_response)
 
-        # print(f"final_response: {final_response}")
+        # logger.debug(f"final_response: {final_response}")
 
         return flask.jsonify({ "llm_response": final_response })
 
     except Exception as e:
-        print("Error:", str(e))
+        logger.error(f"Error: {str(e)}", exc_info=True)
         return flask.jsonify({ "error": str(e) }), 500
     
 def get_qdrant_data(prompt: str) -> str:
+    logger.setLevel(logging.INFO)
     if not prompt:
-        print("Missing Prompt")
+        logger.error("Missing Prompt")
         return jsonify({"error": "Missing prompt"}), 400
     try:
         answer = query_qdrant(prompt)
         return jsonify({"answer": answer})
     except Exception as e:
-        print(f"error: {str(e)}")
+        logger.error(f"error: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+    finally:
+        logger.setLevel(logging.DEBUG)
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     return f'Here is the original prompt from the user: {prompt}\nNext is some relevant information from Neo4j, this is blank if there was no relevant info in the knowledge graph database. This info can be a count of emails if the user prompt asks something along the lines of "how many emails did person X send to person Y?". Or it can be the body of emails that are relevant to the question, like if the user prompt was "Summarize the emails sent between person X and person Y". Use the returned info to answer the user prompt, and quote lines from the email bodies directly when possible, citing the email you used. Here are the results from querying Neo4j with the prompt: {neo4j_data}\nNext is the result of running the prompt through Qdrant. Qdrant should return examples of emails that are relevant or help answer the prompt. Use these emails as the source for your answer to the prompt, and directly quote them as examples. Here is the result of running the prompt through Qdrant: {qdrant_data}\nRemember to use both the info from Neo4j and Qdrant to answer your question, using direct quotes and citations from the data as much as possible. If there was any data returned by Neo4j and Qdrant use that and avoid using your own knowledge.\n'
 
 def get_files(filenames: list[str]):
+    """
     code taken from parser.py
     """
     email_files = []
@@ -151,7 +174,7 @@ def get_files(filenames: list[str]):
                 email_files.append(parsed_email)
                 
             except AttributeError:
-                print(f"Failed to parse {filename}")
+                logger.error(f"Failed to parse {filename}")
                 return None
         
     return email_files
@@ -163,7 +186,7 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
         'message': prompt
     })
     
-    print("Using API KEY:", API_KEY[:6] + "..." if API_KEY else "None set")
+    logger.info(f"Using API KEY: {API_KEY[:6]}..." if API_KEY else "None set")
 
     response = requests.post('https://api.llms.afterhoursdev.com/chat/completions',
                            headers={
@@ -196,4 +219,5 @@ def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: floa
     return llama_output
 
 if __name__ == '__main__':
+    logger.info(f"Starting Flask server on {FLASK_HOST}:{FLASK_PORT}")
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=True)

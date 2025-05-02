@@ -7,6 +7,7 @@ from tqdm import tqdm
 import os
 import logging
 import copy
+from email.utils import parsedate_to_datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -55,7 +56,7 @@ def bulk_create_emails(tx, emails):
     query = """
     UNWIND $batch AS row
     MERGE (e:Email {id: row.id})
-    SET e.time = row.time, e.thread = row.thread, e.body = row.body, e.filepath = row.filepath
+    SET e.time = row.time, e.thread = row.thread, e.subject = row.subject, e.body = row.body, e.filename = row.filename
     """
     tx.run(query, batch=emails)
 
@@ -128,16 +129,6 @@ def clear_database(tx):
     logger.info("Database cleared successfully.")
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "--clear":
-        # Clear the database
-        logger.info("Clearing the database...")
-        try:
-            driver = GraphDatabase.driver(URL, auth=(USERNAME, PASSWORD))
-            with driver.session() as session:
-                clear_database(session)
-        except Exception as e:
-            logger.error(f"❌ Error clearing database: {e}")
-            sys.exit(1)
 
     # Load data from local JSON files
     try:
@@ -171,6 +162,19 @@ def main():
             break
         except ValueError:
             logger.error("Invalid value provided for max_emails or max_users. Please provide integers.")
+
+
+    # Check if the user wants to clear the database
+    if len(sys.argv) > 1 and sys.argv[1] == "--clear":
+        # Clear the database
+        logger.info("Clearing the database...")
+        try:
+            driver = GraphDatabase.driver(URL, auth=(USERNAME, PASSWORD))
+            with driver.session() as session:
+                clear_database(session)
+        except Exception as e:
+            logger.error(f"❌ Error clearing database: {e}")
+            sys.exit(1)
     
 
 
@@ -246,6 +250,7 @@ def main():
         emails = copy.deepcopy(messages_data)
         for idx, email in enumerate(emails):
             email["id"] = str(idx)  # Unique email id based on the index
+            email["time"] = parsedate_to_datetime(email.get("time", None)) # Use parsedate_to_datetime
         
         # Calculate number of batches
         num_batches = (len(emails) + BATCH_SIZE - 1) // BATCH_SIZE

@@ -128,7 +128,7 @@ def parse_email(pathname, orig=True, progress_bar=None):
             user_threads[user].add(thread_id)
  
         # Create the email entry and add it to the feeds list
-        entry =  {"time": time, "thread": thread_id, "from": from_id, "to": to_ids, "cc": cc_ids, "bcc": bcc_ids, "subject": subject, "body": body}
+        entry =  {"time": time, "thread": thread_id, "from": from_id, "to": to_ids, "cc": cc_ids, "bcc": bcc_ids, "subject": subject, "body": body, "filename": pathname}
         feeds.append(entry)
 
         # Update progress bar after processing each file
