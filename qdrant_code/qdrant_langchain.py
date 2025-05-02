@@ -69,6 +69,8 @@ def query_qdrant(query_text: str) -> str:
         # Step 2: Retrieve relevant documents using optimized query
         retrieved_docs = retriever.invoke(optimized_query)
 
+        filenames = [doc.metadata.get('filename', 'No filename found') for doc in retrieved_docs]
+
         # Step 3: Format retrieved documents into a single context string
         formatted_context = "\n\n".join([
             document_prompt.format(**doc.metadata, page_content=doc.page_content)

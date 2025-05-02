@@ -27,7 +27,7 @@ First make sure you have a local instance of Neo4j RUNNING:
 
 #### To populate the graph with the Enron email dataset:
 ```bash
-python Neo4j/neo4j_uploader.py <max_emails> <max_users>
+python neo4j_code/neo4j_uploader.py <max_emails> <max_users>
 ```
 
 #### Viewing the Neo4j Graph

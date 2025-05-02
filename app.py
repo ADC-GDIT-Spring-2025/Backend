@@ -4,6 +4,7 @@ import flask
 from flask import jsonify
 import json
 import os
+import re
 from flask_cors import CORS
 import requests
 
@@ -91,6 +92,69 @@ def get_qdrant_data(prompt: str) -> str:
 
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     return f'Here is the original prompt from the user: {prompt}\nNext is some relevant information from Neo4j, this is blank if there was no relevant info in the knowledge graph database. This info can be a count of emails if the user prompt asks something along the lines of "how many emails did person X send to person Y?". Or it can be the body of emails that are relevant to the question, like if the user prompt was "Summarize the emails sent between person X and person Y". Use the returned info to answer the user prompt, and quote lines from the email bodies directly when possible, citing the email you used. Here are the results from querying Neo4j with the prompt: {neo4j_data}\nNext is the result of running the prompt through Qdrant. Qdrant should return examples of emails that are relevant or help answer the prompt. Use these emails as the source for your answer to the prompt, and directly quote them as examples. Here is the result of running the prompt through Qdrant: {qdrant_data}\nRemember to use both the info from Neo4j and Qdrant to answer your question, using direct quotes and citations from the data as much as possible. If there was any data returned by Neo4j and Qdrant use that and avoid using your own knowledge.\n'
+
+def get_files(filenames: list[str]):
+    code taken from parser.py
+    """
+    email_files = []
+    for filename in filenames:
+        filename = os.path.join(os.path.dirname(__file__), "data/maildir", filename)
+        with open(filename, encoding='utf-8', errors='replace') as TextFile:
+            text = TextFile.read().replace("\r", "")
+            # Skip characters outside of Unicode range
+            text = re.sub(r'[^\x00-\x7F]+', '', text)  # Remove non-ASCII characters
+            try:
+                #
+                # Precompiled regular expression patterns for email parsing
+                # These patterns are compiled once for performance optimization when processing many emails
+                #
+                time_pattern = re.compile(r"Date: (?P<data>[A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4} \d{2}:\d{2}:\d{2} -\d{4} \([A-Z]{3}\))")
+                subject_pattern = re.compile(r"Subject: (?P<data>.*)")
+                sender_pattern = re.compile(r"From: (?P<data>.*)")
+                recipient_pattern = re.compile(r"To: (?P<data>.*)")
+                cc_pattern = re.compile(r"cc: (?P<data>.*)")
+                bcc_pattern = re.compile(r"bcc: (?P<data>.*)")
+                msg_start_pattern = re.compile(r"\n\n", re.MULTILINE)  # Email body typically starts after two newlines
+                msg_end_pattern = re.compile(r"\n+.*\n\d+/\d+/\d+ \d+:\d+ [AP]M", re.MULTILINE)  # Pattern to detect end of message in replies
+
+
+                # Extract email metadata
+                time = time_pattern.search(text).group("data").replace("\n", "")
+                subject = subject_pattern.search(text).group("data").replace("\n", "")
+                sender = sender_pattern.search(text).group("data").replace("\n", "")
+                recipient = recipient_pattern.search(text).group("data").split(", ")
+                cc = cc_pattern.search(text).group("data").split(", ")
+                bcc = bcc_pattern.search(text).group("data").split(", ")
+                
+                # Extract email body
+                msg_start_iter = msg_start_pattern.search(text).end()
+                try:
+                    msg_end_iter = msg_end_pattern.search(text).start()
+                    message = text[msg_start_iter:msg_end_iter]
+                except AttributeError:  # not a reply
+                    message = text[msg_start_iter:]
+                
+                # Clean up the message text to avoid errors from special characters
+                message = re.sub("[\n\r]", " ", message)
+                message = re.sub("  +", " ", message)
+
+
+                parsed_email = {
+                    "time": time,
+                    "subject": subject,
+                    "from": sender,
+                    "to": recipient,
+                    "cc": cc,
+                    "bcc": bcc,
+                    "message": message
+                }
+                email_files.append(parsed_email)
+                
+            except AttributeError:
+                print(f"Failed to parse {filename}")
+                return None
+        
+    return email_files
 
 def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
     # add the prompt to the thread
