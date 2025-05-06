@@ -122,7 +122,7 @@ def route():
 
         # logger.debug(f"final_response: {final_response}")
 
-        return flask.jsonify({ "llm_response": final_response, "emails": neo4j_emails })
+        return flask.jsonify({ "llm_response": final_response, "raw_emails": neo4j_emails })
 
     except Exception as e:
         logger.error(f"Error: {str(e)}", exc_info=True)
