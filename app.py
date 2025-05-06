@@ -79,6 +79,8 @@ def route():
         for entry in neo4j_data:
             if 'e.filename' in entry:
                 neo4j_emails.append(entry['e.filename'])
+            if 'filename' in entry:
+                neo4j_emails.append(entry['filename'])
         print(f"NEO4J EMAILS: {neo4j_emails}")
 
         # Get the email files from the filenames via the parsed data
