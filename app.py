@@ -10,7 +10,7 @@ import requests
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 FLASK_HOST='127.0.0.1'
@@ -74,6 +74,34 @@ def route():
             else:
                 logger.info("No Neo4j results, or error occurred.")
                 neo4j_data = []
+
+        neo4j_emails = []
+        for entry in neo4j_data:
+            if 'e.filename' in entry:
+                neo4j_emails.append(entry['e.filename'])
+        print(f"NEO4J EMAILS: {neo4j_emails}")
+
+        # Get the email files from the filenames via the parsed data
+        # open the parsed data json file
+        with open('user_data/messages.json', 'r') as f:
+            messages = json.load(f)
+
+        with open('user_data/users.json', 'r') as f:
+            users = json.load(f)
+            # Swap key/value of the users dictionary
+            users = {v: k for k, v in users.items()}
+
+        # get the email files using filename
+        neo4j_emails = [{
+            'subject': email['subject'],
+            'body': email['body'],
+            'to': [users[id] for id in email['to']],
+            'from': users[email['from']],
+            'time': email['time'],
+            'cc': [users[id] for id in email['cc']],
+            'bcc': [users[id] for id in email['bcc']]
+        } for email in messages if email['filename'] in neo4j_emails]
+        
         
         qdrant_data_string = ""
         if filters['useQdrant']:
@@ -92,7 +120,7 @@ def route():
 
         # logger.debug(f"final_response: {final_response}")
 
-        return flask.jsonify({ "llm_response": final_response })
+        return flask.jsonify({ "llm_response": final_response, "emails": neo4j_emails })
 
     except Exception as e:
         logger.error(f"Error: {str(e)}", exc_info=True)

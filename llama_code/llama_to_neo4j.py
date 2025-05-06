@@ -33,7 +33,7 @@ Graph schema:
 
 Nodes:
 (:Person {{id: string, email: string}}) — use the email property, not name, emails are formatted as firstname.lastname@enron.com
-(:Email {{thread_id: string, subject: string, body: string}})
+(:Email {{thread: number, subject: string, body: string, filename: string, time: string}})
 
 Relationships:
 (:Person)-[:SENT]->(:Email)
@@ -43,7 +43,7 @@ Relationships:
 (:Email)-[:REPLY]->(:Email)
 (:Email)-[:FORWARD]->(:Email)
 
-Limit the response from neo4j to 10 nodes for cases where the query returns the email body itself so as to not overload the reponse.
+Limit the response from neo4j to 10 nodes for cases where the query returns the email body itself so as to not overload the response, unless the number of emails is specified in the prompt.
 """
 
 message_thread = []
@@ -89,6 +89,7 @@ If the question does not need specific information from the dataset to be answer
 
 If you need to perform multiple match statements, COMBINE them into one query.
 Do NOT include explanations or formatting — return ONLY the Cypher query. 
+The Cypher query must ensure the filename of any email node is included in the results.
 Your response should start with "MATCH" and be a VALID Cypher query.
 Only provide ONE Cypher query, do NOT provide multiple queries or options.
 {filter_instructions}
@@ -117,7 +118,8 @@ Generate a new, corrected Cypher query that:
 2. Must be syntactically valid
 3. Must use the schema exactly as shown above
 4. Must answer the original question
-5. Must include ALL the filter requirements listed below:
+5. MUST include the filename of each email node in the results.
+6. Must include ALL the filter requirements listed below:
 {filter_instructions}
 
 Return ONLY the corrected Cypher query with no explanations or additional text.
@@ -129,8 +131,8 @@ Cypher query:
 # ========== Calling the Llama model ==========
 
 def query_llama(prompt: str) -> str:
-    logger.info(f"Querying Llama model: {MODEL_NAME}")
-    logger.info(f"Llama prompt: {prompt}")
+    # logger.info(f"Querying Llama model: {MODEL_NAME}")
+    # logger.info(f"Llama prompt: {prompt}")
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
@@ -151,10 +153,10 @@ def query_llama(prompt: str) -> str:
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
         response.raise_for_status()
-        logger.info(f"Llama API request successful (Status: {response.status_code})")
+        # logger.info(f"Llama API request successful (Status: {response.status_code})")
         data = response.json()
         generation = data.get("generation", "").strip()
-        logger.info(f"Llama generation received: {generation}")
+        # logger.info(f"Llama generation received: {generation}")
         return generation
     except requests.exceptions.RequestException as e:
         logger.error(f"Error calling Llama API: {e}")
@@ -194,6 +196,7 @@ def query_neo4j(prompt: str, filters: dict = None) -> str:
     logger.info(f"Appended user message to thread. Current thread length: {len(message_thread)}")
     
     full_prompt = apply_template(prompt, filters)
+    logger.info(f"Generated full prompt for Llama: {full_prompt}")
     cypher_query = query_llama(full_prompt)
     results = None
 
