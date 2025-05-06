@@ -43,7 +43,7 @@ Relationships:
 (:Email)-[:REPLY]->(:Email)
 (:Email)-[:FORWARD]->(:Email)
 
-Limit the response from neo4j to 10 nodes for cases where the query returns the email body itself so as to not overload the response, unless the number of emails is specified in the prompt.
+Limit the response to the number specified in the prompt, up to a maximum of 10 if email bodies are included.
 """
 
 message_thread = []

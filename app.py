@@ -75,12 +75,22 @@ def route():
                 logger.info("No Neo4j results, or error occurred.")
                 neo4j_data = []
 
-        neo4j_emails = []
-        for entry in neo4j_data:
-            if 'e.filename' in entry:
-                neo4j_emails.append(entry['e.filename'])
-            if 'filename' in entry:
-                neo4j_emails.append(entry['filename'])
+        def extract_filenames(data):
+            filenames = []
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    if key in ['filename', 'e.filename']:
+                        filenames.append(value)
+                        filenames.extend(extract_filenames(value))
+                    elif isinstance(data, list):
+                        for item in data:
+                            filenames.extend(extract_filenames(item))
+            elif isinstance(data, list):
+                for item in data:
+                    filenames.extend(extract_filenames(item))
+            return filenames
+
+        neo4j_emails = extract_filenames(neo4j_data)
         print(f"NEO4J EMAILS: {neo4j_emails}")
 
         # Get the email files from the filenames via the parsed data
@@ -103,6 +113,8 @@ def route():
             'cc': [users[id] for id in email['cc']],
             'bcc': [users[id] for id in email['bcc']]
         } for email in messages if email['filename'] in neo4j_emails]
+
+        print(f'NEO4J EMAILS: {neo4j_emails}')
         
         
         qdrant_data_string = ""
