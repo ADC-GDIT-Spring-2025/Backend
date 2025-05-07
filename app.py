@@ -221,7 +221,7 @@ def get_files(filenames: list[str]):
         
     return email_files
 
-def query_llama(prompt: str, model: str = 'meta-llama3.3-70b', temperature: float = 0.7, maxGenLen: int = 512) -> str:
+def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.7, maxGenLen: int = 2048) -> str:
     # add the prompt to the thread
     thread.append({
         'role': 'user',
