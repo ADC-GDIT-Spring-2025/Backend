@@ -1,10 +1,10 @@
 from llama_code.llama_to_neo4j import query_neo4j
 from qdrant_code.qdrant_langchain import query_qdrant
 import flask
-from flask import jsonify
+from flask import jsonify  
 import json
-import os
-import re
+import os  
+import re  
 from flask_cors import CORS
 import requests
 import logging
@@ -13,10 +13,15 @@ import logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Flask server configuration
 FLASK_HOST='127.0.0.1'
 FLASK_PORT=8080
+
+# Set up API key for LLaMA API
+os.environ['LLAMA_API_KEY'] = 'a509790793f9864cbe4b3fdb1aab0c44169ae5c780dab12a96ad7824f7d5a78f'
 API_KEY = os.environ.get("LLAMA_API_KEY")
 
+# System prompt for LLaMA API
 SYSTEM_PROMPT="""
     You are LLaMA, a generative AI chatbot trained to assist users by generating informative, accurate, and context-aware responses. 
     Your primary task is to answer user questions related to the Enron email dataset.  
@@ -32,28 +37,32 @@ SYSTEM_PROMPT="""
     
     Always aim to be **concise, accurate, and engaging**, ensuring clarity in your explanations."""
 
+# Initialize Flask app
 app = flask.Flask(__name__)
-CORS(app)
+CORS(app)  # Enable CORS for cross-origin requests
 
 # MAIN THREAD OF CONVERSATION, FOR CONTEXT
-thread = []
+thread = []  # Global variable to store conversation history
 
+# Route to check if the server is running
 @app.route('/', methods=['GET'])
 def index():
     return 'Server is running on port 5002.'
 
+# Route to clear the conversation thread
 @app.route('/clear', methods=['GET'])
 def clear():
     global thread
-    thread = []
+    thread = []  # Clear the global thread
     logger.info("Thread cleared")
     return flask.jsonify({ "message": "Backend thread cleared" }), 200
-    
 
+# Main route to handle user queries
 @app.route('/', methods=['POST'])
 def route():
     global thread
     try:
+        # Extract the user prompt from the request
         prompt = flask.request.json.get('prompt', '').strip()
         logger.info(f'RECIEVED PROMPT: {prompt}')
 
@@ -61,10 +70,11 @@ def route():
             logger.error("No prompt provided")
             return flask.jsonify({ "error": "No prompt provided" }), 400
         
+        # Extract filters from the request
         filters = flask.request.json.get('filters', None)
         logger.info(f'RECIEVED FILTERS: {filters}')
 
-
+        # Query Neo4j database if enabled in filters
         neo4j_data = []
         if filters['useNeo4j']:
             neo4j_data = query_neo4j(prompt, filters)
@@ -75,6 +85,7 @@ def route():
                 logger.info("No Neo4j results, or error occurred.")
                 neo4j_data = []
 
+        # Extract filenames from Neo4j data
         def extract_filenames(data):
             filenames = []
             if isinstance(data, dict):
@@ -93,17 +104,15 @@ def route():
         neo4j_emails = extract_filenames(neo4j_data)
         print(f"NEO4J EMAILS: {neo4j_emails}")
 
-        # Get the email files from the filenames via the parsed data
-        # open the parsed data json file
+        # Load email metadata from parsed data
         with open('user_data/messages.json', 'r') as f:
             messages = json.load(f)
 
         with open('user_data/users.json', 'r') as f:
             users = json.load(f)
-            # Swap key/value of the users dictionary
-            users = {v: k for k, v in users.items()}
+            users = {v: k for k, v in users.items()}  # Reverse key-value pairs
 
-        # get the email files using filename
+        # Match filenames to email metadata
         neo4j_emails = [{
             'subject': email['subject'],
             'body': email['body'],
@@ -116,7 +125,7 @@ def route():
 
         print(f'NEO4J EMAILS: {neo4j_emails}')
         
-        
+        # Query Qdrant database if enabled in filters
         qdrant_data_string = ""
         if filters['useQdrant']:
             qdrant_data = get_qdrant_data(prompt)
@@ -124,22 +133,21 @@ def route():
             logger.info("QDRANT RESULT —————————————————————————————————————————————————————————")
             logger.info(qdrant_data_string)
 
+        # Combine Neo4j and Qdrant data into a final prompt
         final_prompt = apply_template(prompt, neo4j_data, qdrant_data_string)
-        # logger.info("FINAL PROMPT —————————————————————————————————————————————————————————")
-        # logger.info(final_prompt)
 
+        # Query LLaMA API with the final prompt
         final_response = query_llama(final_prompt)
         logger.info("RETURNING LLAMA RESPONSE —————————————————————————————————————————————————————————")
         logger.info(final_response)
-
-        # logger.debug(f"final_response: {final_response}")
 
         return flask.jsonify({ "llm_response": final_response, "raw_emails": neo4j_emails })
 
     except Exception as e:
         logger.error(f"Error: {str(e)}", exc_info=True)
         return flask.jsonify({ "error": str(e) }), 500
-    
+
+# Function to query Qdrant database
 def get_qdrant_data(prompt: str) -> str:
     logger.setLevel(logging.INFO)
     if not prompt:
@@ -154,12 +162,20 @@ def get_qdrant_data(prompt: str) -> str:
     finally:
         logger.setLevel(logging.DEBUG)
 
+# Function to format the final prompt for LLaMA API
 def apply_template(prompt: str, neo4j_data: str, qdrant_data: str) -> str:
     return f'Here is the original prompt from the user: {prompt}\nNext is some relevant information from Neo4j, this is blank if there was no relevant info in the knowledge graph database. This info can be a count of emails if the user prompt asks something along the lines of "how many emails did person X send to person Y?". Or it can be the body of emails that are relevant to the question, like if the user prompt was "Summarize the emails sent between person X and person Y". Use the returned info to answer the user prompt, and quote lines from the email bodies directly when possible, citing the email you used. Here are the results from querying Neo4j with the prompt: {neo4j_data}\nNext is the result of running the prompt through Qdrant. Qdrant should return examples of emails that are relevant or help answer the prompt. Use these emails as the source for your answer to the prompt, and directly quote them as examples. Here is the result of running the prompt through Qdrant: {qdrant_data}\nRemember to use both the info from Neo4j and Qdrant to answer your question, using direct quotes and citations from the data as much as possible. If there was any data returned by Neo4j and Qdrant use that and avoid using your own knowledge.\n'
 
+# Function to retrieve email files based on filenames
 def get_files(filenames: list[str]):
     """
-    code taken from parser.py
+    Retrieve email files based on filenames and parse their content.
+
+    Args:
+        filenames (list[str]): List of filenames to retrieve.
+
+    Returns:
+        list[dict]: List of parsed email metadata.
     """
     email_files = []
     for filename in filenames:
@@ -221,12 +237,19 @@ def get_files(filenames: list[str]):
         
     return email_files
 
-# temperature = amount of randomness in the output
-def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.1) -> str:
-    # tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-70b-chat-hf")
-    # input_tokens_count = tokenizer.encode(prompt.append(SYSTEM_PROMPT), add_special_tokens=False)
-    # print(" ============ Input token count:", len(input_tokens_count), " =============== ")
-    
+# Function to query LLaMA API
+def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.7) -> str:
+    """
+    Query the LLaMA API with the given prompt.
+
+    Args:
+        prompt (str): User prompt to query the API.
+        model (str): Model name to use for the query.
+        temperature (float): Sampling temperature for the query.
+
+    Returns:
+        str: Response from the LLaMA API.
+    """
     # add the prompt to the thread
     thread.append({
         'role': 'user',
@@ -235,7 +258,6 @@ def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperatur
     
     logger.info(f"Using API KEY: {API_KEY[:6]}..." if API_KEY else "None set")
 
-    
     response = requests.post('https://api.llms.afterhoursdev.com/chat/completions',
                            headers={
                                'Content-Type': 'application/json',
@@ -263,9 +285,9 @@ def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperatur
         'message': llama_output
     })
 
-
     return llama_output
 
+# Start the Flask server
 if __name__ == '__main__':
     logger.info(f"Starting Flask server on {FLASK_HOST}:{FLASK_PORT}")
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=True)
