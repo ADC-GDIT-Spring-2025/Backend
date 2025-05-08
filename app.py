@@ -221,7 +221,11 @@ def get_files(filenames: list[str]):
         
     return email_files
 
-def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.7, maxGenLen: int = 2048) -> str:
+def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.7) -> str:
+    # tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-70b-chat-hf")
+    # input_tokens_count = tokenizer.encode(prompt, add_special_tokens=False)
+    # print(" ============ Input token count:", len(input_tokens_count), " =============== ")
+    
     # add the prompt to the thread
     thread.append({
         'role': 'user',
@@ -230,6 +234,7 @@ def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperatur
     
     logger.info(f"Using API KEY: {API_KEY[:6]}..." if API_KEY else "None set")
 
+    
     response = requests.post('https://api.llms.afterhoursdev.com/chat/completions',
                            headers={
                                'Content-Type': 'application/json',
@@ -240,7 +245,7 @@ def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperatur
                                'messages': thread,
                                'system': SYSTEM_PROMPT,
                                'temperature': temperature,
-                               'max_tokens': maxGenLen,
+                                'max_tokens': 10000000 - len(prompt.split(sep = ' ')) - len(SYSTEM_PROMPT.split(sep = ' ')),
                            })
     
     
