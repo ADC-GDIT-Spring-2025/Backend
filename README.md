@@ -1,4 +1,37 @@
-# Enron Email Dataset to Neo4j
+# Running Backend and Database Systems
+
+## Project Structure
+
+The project is organized into the following directories and files:
+
+```
+├── app.py                     # Main Flask application for handling API requests
+├── etl_parse.sh               # Script for parsing and setting up the Enron dataset
+├── README.md                  # Documentation for the project
+├── requirements.txt           # Python dependencies for the project
+├── setup_venv.sh              # Script to set up the Python virtual environment
+├── startup.sh                 # Script to start the backend and frontend
+├── data/                      # Directory containing the raw Enron dataset
+│   ├── enron_mail.tar.gz      # Compressed Enron email dataset
+│   └── maildir/               # Extracted email data organized by user
+├── llama_code/                # Code for interacting with LLaMA API
+│   └── llama_to_neo4j.py      # Converts user queries to Cypher queries for Neo4j
+├── neo4j_code/                # Code for interacting with Neo4j database
+│   ├── neo4j_uploader_bulk.py # Script to upload data to Neo4j in bulk
+│   └── schema.json            # Schema definition for Neo4j
+├── qdrant_code/               # Code for interacting with Qdrant vector database
+│   ├── initialize_groq.py     # Initializes Groq API client
+│   ├── qdrant_cli_test.py     # CLI for testing Qdrant queries
+│   ├── qdrant_langchain.py    # LangChain integration with Qdrant
+│   ├── data_for_qdrant/       # Data preparation for Qdrant
+│   │   ├── clean_emails.py    # Script to clean and preprocess emails
+│   │   ├── docslist.pkl       # Preprocessed document list
+│   │   └── embeddings.npy     # Precomputed embeddings
+│   └── qdrant_db/             # Qdrant database files
+├── util/                      # Utility scripts
+│   ├── fetch_data.py          # Script to fetch the Enron dataset
+│   └── parser.py              # Script to parse raw email data
+```
 
 ## Setup
 
@@ -46,6 +79,12 @@ Open a browser and go to `http://localhost:7474`
 - Enter the username and password (neo4j/cheerios4150)
 - Enter the command `MATCH (n) RETURN n` in the console at the top to get all nodes in the graph
 - Click on the `Graph` tab (on the left) to view the graph
+
+#### Setting up Qdrant
+
+- In `qdrant_code/qdrant_db`, create a new folder named `collection`
+- Create a new folder inside the `collection` folder called `enron_emails`
+- Move the provided `storage.sqlite` file into `qdrant_code/qdrant_db/collection/enron_emails`
 
 ### Setup for the full pipeline
 
