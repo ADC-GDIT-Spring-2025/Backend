@@ -18,7 +18,6 @@ FLASK_HOST='127.0.0.1'
 FLASK_PORT=8080
 
 # Set up API key for LLaMA API
-os.environ['LLAMA_API_KEY'] = 'a509790793f9864cbe4b3fdb1aab0c44169ae5c780dab12a96ad7824f7d5a78f'
 API_KEY = os.environ.get("LLAMA_API_KEY")
 
 # System prompt for LLaMA API
@@ -238,7 +237,8 @@ def get_files(filenames: list[str]):
     return email_files
 
 # Function to query LLaMA API
-def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.7) -> str:
+# temperature = determines the randomness of the output. Lower values make the output more deterministic.
+def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.1) -> str:
     """
     Query the LLaMA API with the given prompt.
 
