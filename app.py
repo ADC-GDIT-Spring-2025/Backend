@@ -221,9 +221,10 @@ def get_files(filenames: list[str]):
         
     return email_files
 
-def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.7) -> str:
+# temperature = amount of randomness in the output
+def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperature: float = 0.1) -> str:
     # tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-70b-chat-hf")
-    # input_tokens_count = tokenizer.encode(prompt, add_special_tokens=False)
+    # input_tokens_count = tokenizer.encode(prompt.append(SYSTEM_PROMPT), add_special_tokens=False)
     # print(" ============ Input token count:", len(input_tokens_count), " =============== ")
     
     # add the prompt to the thread
@@ -245,7 +246,7 @@ def query_llama(prompt: str, model: str = 'meta-llama4-maverick-17b', temperatur
                                'messages': thread,
                                'system': SYSTEM_PROMPT,
                                'temperature': temperature,
-                                'max_tokens': 10000000 - len(prompt.split(sep = ' ')) - len(SYSTEM_PROMPT.split(sep = ' ')),
+                                'max_tokens': 10000000 - len(prompt.split(sep = ' ')) * 0.2 - len(SYSTEM_PROMPT.split(sep = ' ')) * 0.2,
                            })
     
     
